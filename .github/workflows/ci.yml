@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 14
+        uses: actions/setup-node@v4
+        with:
+          node-version: "14"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run unit tests
+        run: CI=true npm test -- --watchAll=false --passWithNoTests
+
+  compile-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 14
+        uses: actions/setup-node@v4
+        with:
+          node-version: "14"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Compile Solidity contracts
+        run: npx mocha tests/compile.js --timeout 120000

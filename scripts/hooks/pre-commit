@@ -1,0 +1,5 @@
+#!/bin/sh
+# Install: cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+set -e
+npm run lint
+CI=true npm test -- --watchAll=false --passWithNoTests
