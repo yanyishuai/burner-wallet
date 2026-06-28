@@ -50,7 +50,8 @@
     "start": "PORT=3000 node scripts/start.js",
     "start-local": "PORT=3000 REACT_APP_MODE=local npx node scripts/start.js",
     "build": "node --max-old-space-size=4000 scripts/build.js",
-    "test": "node scripts/test.js"
+    "test": "node scripts/test.js",
+    "lint": "eslint src --ext .js,.jsx --max-warnings 9999"
   },
   "eslintConfig": {
     "extends": "react-app"
