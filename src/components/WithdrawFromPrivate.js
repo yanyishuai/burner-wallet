@@ -7,6 +7,7 @@ import Badges from "../components/Badges";
 import Blockies from 'react-blockies';
 import axios from 'axios';
 import i18n from '../i18n';
+import estimateTxGas from '../services/estimateGas';
 
 let pollInterval
 let metaReceiptTracker = {}
@@ -109,7 +110,7 @@ export default class SendToAddress extends React.Component {
     return ( parseFloat(this.state.badgeCount)>0 || (parseFloat(this.state.amount) > 0 && parseFloat(this.state.amount) <= parseFloat(this.state.fromBalance)))
   }
 
-  withdraw = () => {
+  withdraw = async () => {
     let { fromAddress, amount, metaAccount } = this.state;
 
 
@@ -124,18 +125,20 @@ export default class SendToAddress extends React.Component {
         if(amount>0){
           if(this.props.ERC20TOKEN){
             tx={
+              from: metaAccount.address,
               to:this.props.contracts[this.props.ERC20TOKEN]._address,
               data: this.props.contracts[this.props.ERC20TOKEN].transfer(this.props.address,this.props.web3.utils.toWei(""+amount,'ether')).encodeABI(),
-              gas: 60000,
               gasPrice: Math.round(1100000000)//1.1gwei
             }
+            tx.gas = await estimateTxGas(this.props.web3, tx, 60000)
           }else{
             tx={
+              from: metaAccount.address,
               to:this.props.address,
               value: this.props.web3.utils.toWei(amount,'ether'),
-              gas: 30000,
               gasPrice: Math.round(1100000000)//1.1gwei
             }
+            tx.gas = await estimateTxGas(this.props.web3, tx, 30000)
           }
 
           this.props.web3.eth.accounts.signTransaction(tx, metaAccount.privateKey).then(signed => {
@@ -160,12 +163,13 @@ export default class SendToAddress extends React.Component {
             console.log("WITHDRAW Badge ",b)
 
             tx={
+              from: metaAccount.address,
               to:this.props.contracts['Badges']._address,
               //.Badges.transferFrom(this.props.address,this.state.toAddress,this.props.badge.id)
               data: this.props.contracts['Badges'].transferFrom(fromAddress,this.props.address,this.state.fromBadges[b].id).encodeABI(),
-              gas: 240000,
               gasPrice: Math.round(1100000000)//1.1gwei
             }
+            tx.gas = await estimateTxGas(this.props.web3, tx, 240000)
 
             this.props.web3.eth.accounts.signTransaction(tx, metaAccount.privateKey).then(signed => {
                 this.props.web3.eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{

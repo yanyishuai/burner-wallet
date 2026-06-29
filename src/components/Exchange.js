@@ -20,6 +20,7 @@ import xdaiImg from '../images/xdai.jpg';
 import InputRange from 'react-input-range';
 import 'react-input-range/lib/css/index.css';
 import core from '../core';
+import estimateTxGas from '../services/estimateGas';
 
 const MAINNET_CHAIN_ID = '1';
 const XDAI_CHAIN_ID = '100';
@@ -219,7 +220,6 @@ export default class Exchange extends React.Component {
                         let paramsObject = {
                           from: this.state.daiAddress,
                           value: amountInWei,
-                          gas: 120000,
                           gasPrice: Math.round(1.1 * 1000000000)
                         }
                         console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
@@ -229,7 +229,8 @@ export default class Exchange extends React.Component {
 
                         console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
-
+                        estimateTxGas(this.state.xdaiweb3, paramsObject, 120000).then((gas) => {
+                          paramsObject.gas = gas;
                         this.state.xdaiweb3.eth.accounts.signTransaction(paramsObject, this.state.xdaiMetaAccount.privateKey).then(signed => {
                           console.log("========= >>> SIGNED",signed)
                             this.state.xdaiweb3.eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
@@ -244,6 +245,7 @@ export default class Exchange extends React.Component {
                               this.props.changeAlert({type: 'danger',message: err.toString()});
                               this.setState({gettingGas:false})
                             }).then(console.log)
+                        });
                         });
 
                       }else{
@@ -527,7 +529,6 @@ export default class Exchange extends React.Component {
           let paramsObject = {
             from: this.state.daiAddress,
             value: 0,
-            gas: 100000,
             gasPrice: Math.round(gwei * 1000000000)
           }
           console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
@@ -540,6 +541,8 @@ export default class Exchange extends React.Component {
 
           console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
+          estimateTxGas(core.getWeb3(MAINNET_CHAIN_ID), paramsObject, 100000).then((gas) => {
+            paramsObject.gas = gas;
           core.getWeb3(MAINNET_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.mainnetMetaAccount.privateKey).then(signed => {
             console.log("========= >>> SIGNED",signed)
               core.getWeb3(MAINNET_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
@@ -552,6 +555,7 @@ export default class Exchange extends React.Component {
                 console.log("EEEERRRRRRRROOOOORRRRR ======== >>>>>",err)
                 this.props.changeAlert({type: 'danger',message: err.toString()});
               }).then(console.log)
+          });
           });
 
         }else{
@@ -703,7 +707,6 @@ export default class Exchange extends React.Component {
           let paramsObject = {
             from: this.state.daiAddress,
             value: amount,
-            gas: 240000,
             gasPrice: Math.round(gwei * 1000000000)
           }
           console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
@@ -717,6 +720,8 @@ export default class Exchange extends React.Component {
 
           console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
+          estimateTxGas(core.getWeb3(MAINNET_CHAIN_ID), paramsObject, 240000).then((gas) => {
+            paramsObject.gas = gas;
           core.getWeb3(MAINNET_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.mainnetMetaAccount.privateKey).then(signed => {
             console.log("========= >>> SIGNED",signed)
               core.getWeb3(MAINNET_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
@@ -729,6 +734,7 @@ export default class Exchange extends React.Component {
                 console.log("EEEERRRRRRRROOOOORRRRR ======== >>>>>",err)
                 this.props.changeAlert({type: 'danger',message: err.toString()});
               }).then(console.log)
+          });
           });
 
         }else{
@@ -892,7 +898,6 @@ export default class Exchange extends React.Component {
                     let paramsObject = {
                       from: this.state.daiAddress,
                       value: amountOfxDaiToDeposit,
-                      gas: 120000,
                       gasPrice: Math.round(1.1 * 1000000000)
                     }
                     console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
@@ -902,6 +907,8 @@ export default class Exchange extends React.Component {
 
                     console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
+                    estimateTxGas(core.getWeb3(XDAI_CHAIN_ID), paramsObject, 120000).then((gas) => {
+                      paramsObject.gas = gas;
                     core.getWeb3(XDAI_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.xdaiMetaAccount.privateKey).then(signed => {
                       console.log("========= >>> SIGNED",signed)
                         core.getWeb3(XDAI_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
@@ -916,6 +923,7 @@ export default class Exchange extends React.Component {
                           console.log("EEEERRRRRRRROOOOORRRRR ======== >>>>>",err)
                           this.props.changeAlert({type: 'danger',message: err.toString()});
                         }).then(console.log)
+                    });
                     });
 
                   }else{
@@ -1019,7 +1027,6 @@ export default class Exchange extends React.Component {
                       let paramsObject = {
                         from: this.state.daiAddress,
                         value: 0,
-                        gas: 120000,
                         gasPrice: Math.round(1.1 * 1000000000)
                       }
                       console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
@@ -1029,6 +1036,8 @@ export default class Exchange extends React.Component {
 
                       console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
+                      estimateTxGas(core.getWeb3(XDAI_CHAIN_ID), paramsObject, 120000).then((gas) => {
+                        paramsObject.gas = gas;
                       core.getWeb3(XDAI_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.xdaiMetaAccount.privateKey).then(signed => {
                         console.log("========= >>> SIGNED",signed)
                           core.getWeb3(XDAI_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
@@ -1043,6 +1052,7 @@ export default class Exchange extends React.Component {
                             console.log("EEEERRRRRRRROOOOORRRRR ======== >>>>>",err)
                             this.props.changeAlert({type: 'danger',message: err.toString()});
                           }).then(console.log)
+                      });
                       });
 
                     }else{
@@ -1319,12 +1329,13 @@ export default class Exchange extends React.Component {
                     from: this.state.daiAddress,
                     to: toDaiBridgeAccount,
                     value: core.getWeb3(XDAI_CHAIN_ID).utils.toWei(""+this.state.amount,'ether'),
-                    gas: 120000,
                     gasPrice: Math.round(1.1 * 1000000000)
                   }
                   console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
                   console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
+                  estimateTxGas(core.getWeb3(XDAI_CHAIN_ID), paramsObject, 120000).then((gas) => {
+                    paramsObject.gas = gas;
                   core.getWeb3(XDAI_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.xdaiMetaAccount.privateKey).then(signed => {
                     console.log("========= >>> SIGNED",signed)
                       core.getWeb3(XDAI_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
@@ -1344,6 +1355,7 @@ export default class Exchange extends React.Component {
                         console.log("EEEERRRRRRRROOOOORRRRR ======== >>>>>",err)
                         this.props.changeAlert({type: 'danger',message: err.toString()});
                       }).then(console.log)
+                  });
                   });
 
                 }else{
@@ -1529,7 +1541,6 @@ export default class Exchange extends React.Component {
 
                 let output = await uniswapContract.methods.getTokenToEthOutputPrice(amountOfEth).call()
                 output = parseFloat(output)
-                output = output - (output*0.0333)
                 console.log("Expected amount of DAI: ",webToUse.utils.fromWei(""+Math.round(output),'ether'))
 
                 let currentBlockNumber = await webToUse.eth.getBlockNumber()
@@ -1671,7 +1682,7 @@ export default class Exchange extends React.Component {
 
                 let output = await uniswapContract.methods.getEthToTokenOutputPrice(amountOfDai).call()
                 output = parseFloat(output)
-                output = Math.round(output - (output*0.0333))
+                output = Math.round(output)
                 console.log("Expected amount of ETH: ",output,webToUse.utils.fromWei(""+ output,'ether'))
 
                 let currentBlockNumber = await webToUse.eth.getBlockNumber()
@@ -1730,7 +1741,6 @@ export default class Exchange extends React.Component {
                         let paramsObject = {
                           from: this.state.daiAddress,
                           value: 0,
-                          gas: 100000,
                           gasPrice: Math.round(gwei * 1000000000)
                         }
                         console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
@@ -1740,6 +1750,8 @@ export default class Exchange extends React.Component {
 
                         console.log("APPROVE TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
+                        estimateTxGas(core.getWeb3(MAINNET_CHAIN_ID), paramsObject, 100000).then((gas) => {
+                          paramsObject.gas = gas;
                         core.getWeb3(MAINNET_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.mainnetMetaAccount.privateKey).then(signed => {
                           console.log("========= >>> SIGNED",signed)
                             core.getWeb3(MAINNET_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', async (receipt)=>{
@@ -1759,7 +1771,6 @@ export default class Exchange extends React.Component {
                                   nonce: manualNonce,
                                   from: this.state.daiAddress,
                                   value: 0,
-                                  gas: 240000,
                                   gasPrice: Math.round(gwei * 1000000000)
                                 }
                                 console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
@@ -1769,6 +1780,8 @@ export default class Exchange extends React.Component {
 
                                 console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
+                                estimateTxGas(core.getWeb3(MAINNET_CHAIN_ID), paramsObject, 240000).then((gas) => {
+                                  paramsObject.gas = gas;
                                 core.getWeb3(MAINNET_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.mainnetMetaAccount.privateKey).then(signed => {
                                   console.log("========= >>> SIGNED",signed)
                                     core.getWeb3(MAINNET_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
@@ -1784,11 +1797,13 @@ export default class Exchange extends React.Component {
                                       this.props.changeAlert({type: 'danger',message: err.toString()});
                                     }).then(console.log)
                                 });
+                                });
                               }
                             }).on('error', (err)=>{
                               this.props.changeAlert({type: 'danger',message: err.toString()});
                               console.log("EEEERRRRRRRROOOOORRRRR ======== >>>>>",err)
                             }).then(console.log)
+                        });
                         });
 
                       }else{
@@ -1802,7 +1817,6 @@ export default class Exchange extends React.Component {
                         let paramsObject = {
                           from: this.state.daiAddress,
                           value: 0,
-                          gas: 240000,
                           gasPrice: Math.round(gwei * 1000000000)
                         }
                         console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
@@ -1812,6 +1826,8 @@ export default class Exchange extends React.Component {
 
                         console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
+                        estimateTxGas(core.getWeb3(MAINNET_CHAIN_ID), paramsObject, 240000).then((gas) => {
+                          paramsObject.gas = gas;
                         core.getWeb3(MAINNET_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.mainnetMetaAccount.privateKey).then(signed => {
                           console.log("========= >>> SIGNED",signed)
                             core.getWeb3(MAINNET_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
@@ -1827,6 +1843,7 @@ export default class Exchange extends React.Component {
                               console.log("EEEERRRRRRRROOOOORRRRR ======== >>>>>",err)
                               this.props.changeAlert({type: 'danger',message: err.toString()});
                             }).then(console.log)
+                        });
                         });
 
                       }

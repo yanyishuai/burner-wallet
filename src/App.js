@@ -42,6 +42,7 @@ import Bottom from './components/Bottom';
 import customRPCHint from './customRPCHint.png';
 import namehash from 'eth-ens-namehash'
 import incogDetect from './services/incogDetect.js'
+import estimateTxGas from './services/estimateGas.js'
 import gnosis from './gnosis.jpg';
 import Safe from './components/Safe'
 import core, { mainAsset as xdai } from './core';
@@ -2376,9 +2377,9 @@ async function tokenSend(to,value,gasLimit,txData,cb){
     console.log("sending with meta account:",this.state.metaAccount.address)
 
     let tx={
+      from: this.state.metaAccount.address,
       to:this.state.contracts[ERC20TOKEN]._address,
       value: 0,
-      gas: setGasLimit,
       gasPrice: Math.round(this.state.gwei * 1010101010)
     }
     if(data){
@@ -2386,6 +2387,7 @@ async function tokenSend(to,value,gasLimit,txData,cb){
     }else{
       tx.data = this.state.contracts[ERC20TOKEN].transfer(to,weiValue).encodeABI()
     }
+    tx.gas = await estimateTxGas(this.state.web3, tx, setGasLimit)
     console.log("TX SIGNED TO METAMASK:",tx)
     this.state.web3.eth.accounts.signTransaction(tx, this.state.metaAccount.privateKey).then(signed => {
       console.log("SIGNED:",signed)
