@@ -1,21 +1,31 @@
-
 //snagged from https://stackoverflow.com/questions/52759238/private-incognito-mode-detection-for-ios-12-safari
 
-function retry(isDone, next) {
-    var current_trial = 0, max_retry = 50, interval = 10, is_timeout = false;
+function retry(isDone, next, maxRetry, intervalMs) {
+    var currentTrial = 0;
+    var maxRetryCount = typeof maxRetry === 'number' ? maxRetry : 50;
+    var interval = typeof intervalMs === 'number' ? intervalMs : 10;
+    var finished = false;
+
+    function finish(isTimeout) {
+        if (finished) {
+            return;
+        }
+        finished = true;
+        window.clearInterval(id);
+        next(isTimeout);
+    }
+
     var id = window.setInterval(
         function() {
             if (isDone()) {
-                window.clearInterval(id);
-                next(is_timeout);
+                finish(false);
+                return;
             }
-            if (current_trial++ > max_retry) {
-                window.clearInterval(id);
-                is_timeout = true;
-                next(is_timeout);
+            if (++currentTrial > maxRetryCount) {
+                finish(true);
             }
         },
-        10
+        interval
     );
 }
 
@@ -58,17 +68,16 @@ module.exports = function(callback) {
             is_private = true;
         }
 
-        if (typeof is_private === 'undefined') {
-            retry(
-                function isDone() {
-                    return db.readyState === 'done' ? true : false;
-                },
-                function next(is_timeout) {
-                    if (!is_timeout) {
-                        is_private = db.result ? false : true;
-                    }
-                }
-            );
+        if (typeof is_private === 'undefined' && db) {
+            db.onerror = function() {
+                is_private = true;
+            };
+            db.onsuccess = function() {
+                is_private = false;
+            };
+            db.onblocked = function() {
+                is_private = false;
+            };
         }
     } else if (isIE10OrLater(window.navigator.userAgent)) {
         is_private = false;
@@ -107,10 +116,11 @@ module.exports = function(callback) {
 
     retry(
         function isDone() {
-            return typeof is_private !== 'undefined' ? true : false;
+            return typeof is_private !== 'undefined';
         },
         function next(is_timeout) {
-            callback(is_private);
+            // Default to normal browsing when detection is inconclusive.
+            callback(is_private === true);
         }
     );
 }
