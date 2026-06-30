@@ -205,7 +205,12 @@ export default class SendToAddress extends React.Component {
         cookie.remove('sendToStartMessage', { path: '/' })
         cookie.remove('sendToAddress', { path: '/' })
 
-        this.props.send(toAddress, value, 120000, txData, (result) => {
+        this.props.send(toAddress, value, 120000, txData, (err, result) => {
+          if(err){
+            this.props.changeAlert({type: 'danger', message: err.toString()})
+            this.props.goBack()
+            return
+          }
           if(result && result.transactionHash){
             this.props.goBack();
             window.history.pushState({},"", "/");

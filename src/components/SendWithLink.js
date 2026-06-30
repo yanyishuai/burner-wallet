@@ -46,7 +46,12 @@ export default class SendWithLink extends React.Component {
       //}else{
         this.props.changeView('loader')
         setTimeout(()=>{window.scrollTo(0,0)},60)
-        this.props.sendWithLink(amount, (result) => {
+        this.props.sendWithLink(amount, (err, result) => {
+          if(err){
+            this.props.changeAlert({type: 'danger', message: err.toString()})
+            this.props.changeView('send_with_link')
+            return
+          }
           if(result && result.transactionHash){
             this.props.changeView('share-link')
             this.props.changeAlert({
