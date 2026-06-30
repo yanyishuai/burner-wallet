@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { ContractLoader, Dapparatus, Transactions, Gas, Address, Events, Blockie, Scaler } from "dapparatus";
+import { ThemeProvider } from 'rimble-ui';
 import Web3 from 'web3';
 import axios from 'axios';
 import { I18nextProvider } from 'react-i18next';
@@ -35,16 +36,38 @@ import Vendors from './components/Vendors';
 import RecentTransactions from './components/RecentTransactions';
 import Footer from './components/Footer';
 import Loader from './components/Loader';
-import burnerlogo from './burnerwallet.png';
 import BurnWallet from './components/BurnWallet'
 import Exchange from './components/Exchange'
 import Bottom from './components/Bottom';
 import customRPCHint from './customRPCHint.png';
 import namehash from 'eth-ens-namehash'
 import incogDetect from './services/incogDetect.js'
+import estimateTxGas from './services/estimateGas.js'
 import gnosis from './gnosis.jpg';
 import Safe from './components/Safe'
 import core, { mainAsset as xdai } from './core';
+import theme from './theme';
+import {
+  syncMetaAccount,
+  importPrivateKeyToLocalSigner,
+  burnLocalSignerKey,
+  metaAccountFromLocalSigner,
+} from './services/burnerKeys';
+import {
+  wrapNativeSend,
+  shouldUseBurnerCoreSend,
+  signTransactionWithBurnerCore,
+  sendSignedTransaction,
+  XDAI_NETWORK,
+} from './services/burnerSend';
+import {
+  WEB3_PROVIDER,
+  ERC20TOKEN,
+  ERC20VENDOR,
+  ERC20IMAGE,
+  ERC20NAME,
+  LOADERIMAGE,
+} from './config';
 
 import bufficorn from './bufficorn.png';
 import cypherpunk from './cypherpunk.png';
@@ -71,20 +94,8 @@ const RNMessageChannel = false //disable React Native for now, it is breaking Sa
 let base64url = require('base64url')
 const EthCrypto = require('eth-crypto');
 
-//const POA_XDAI_NODE = "https://dai-b.poa.network"
-const POA_XDAI_NODE = "https://dai.poa.network"
-
 const MAINNET_CHAIN_ID = '1';
 
-let XDAI_PROVIDER = POA_XDAI_NODE
-
-let WEB3_PROVIDER
-let CLAIM_RELAY
-let ERC20TOKEN
-let ERC20VENDOR
-let ERC20IMAGE
-let ERC20NAME
-let LOADERIMAGE = burnerlogo
 let HARDCODEVIEW = false//"apps"// = "receipt"
 let FAILCOUNT = 0
 
@@ -102,65 +113,6 @@ let title = i18n.t('app_name')
 let titleImage = (
   <span style={{paddingRight:20,paddingLeft:16}}><i className="fas fa-fire" /></span>
 )
-
-//<i className="fas fa-fire" />
-if (window.location.hostname.indexOf("localhost") >= 0 || window.location.hostname.indexOf("10.0.0.107") >= 0) {
-  XDAI_PROVIDER = "http://localhost:8545"
-  WEB3_PROVIDER = "http://localhost:8545";
-  CLAIM_RELAY = 'http://localhost:18462'
-  if(true){
-    ERC20NAME = false
-    ERC20TOKEN = false
-    ERC20IMAGE = false
-  }else{
-    ERC20NAME = 'BUFF'
-    ERC20VENDOR = 'VendingMachine'
-    ERC20TOKEN = 'ERC20Vendable'
-    ERC20IMAGE = bufficorn
-    XDAI_PROVIDER = "http://localhost:8545"
-    WEB3_PROVIDER = "http://localhost:8545";
-    LOADERIMAGE = bufficorn
-  }
-
-}
-else if (window.location.hostname.indexOf("s.xdai.io") >= 0) {
-  WEB3_PROVIDER = POA_XDAI_NODE;
-  CLAIM_RELAY = 'https://x.xdai.io'
-  ERC20TOKEN = false//'Burner'
-}
-else if (window.location.hostname.indexOf("wallet.galleass.io") >= 0) {
-  //WEB3_PROVIDER = "https://rinkeby.infura.io/v3/e0ea6e73570246bbb3d4bd042c4b5dac";
-  WEB3_PROVIDER = "http://localhost:8545"
-  //CLAIM_RELAY = 'https://x.xdai.io'
-  ERC20TOKEN = false//'Burner'
-  document.domain = 'galleass.io'
-}
-else if (window.location.hostname.indexOf("qreth") >= 0) {
-  WEB3_PROVIDER = "https://mainnet.infura.io/v3/e0ea6e73570246bbb3d4bd042c4b5dac"
-  CLAIM_RELAY = false
-  ERC20TOKEN = false
-}
-else if (window.location.hostname.indexOf("xdai") >= 0) {
-  WEB3_PROVIDER = POA_XDAI_NODE;
-  CLAIM_RELAY = 'https://x.xdai.io'
-  ERC20TOKEN = false
-}
-else if (window.location.hostname.indexOf("buffidai") >= 0) {
-  WEB3_PROVIDER = POA_XDAI_NODE;
-  CLAIM_RELAY = 'https://x.xdai.io'
-  ERC20NAME = 'BUFF'
-  ERC20VENDOR = 'VendingMachine'
-  ERC20TOKEN = 'ERC20Vendable'
-  ERC20IMAGE = bufficorn
-  LOADERIMAGE = bufficorn
-}
-else if (window.location.hostname.indexOf("burnerwithrelays") >= 0) {
-  WEB3_PROVIDER = "https://dai.poa.network";
-  ERC20NAME = false
-  ERC20TOKEN = false
-  ERC20IMAGE = false
-}
-
 
 if(ERC20NAME=="BUFF"){
   mainStyle.backgroundImage = "linear-gradient(#540d48, #20012d)"
@@ -309,10 +261,10 @@ class App extends Component {
       state.amount = parts[1]
     }
     if(parts.length>2){
-      state.message = decodeURI(parts[2]).replaceAll("%23","#").replaceAll("%3B",";").replaceAll("%3A",":").replaceAll("%2F","/")
+      state.message = decodeURI(parts[2]).replace(/%23/g,"#").replace(/%3B/g,";").replace(/%3A/g,":").replace(/%2F/g,"/")
     }
     if(parts.length>3){
-      state.extraMessage = decodeURI(parts[3]).replaceAll("%23","#").replaceAll("%3B",";").replaceAll("%3A",":").replaceAll("%2F","/")
+      state.extraMessage = decodeURI(parts[3]).replace(/%23/g,"#").replace(/%3B/g,";").replace(/%3A/g,":").replace(/%2F/g,"/")
     }
     //console.log("STATE",state)
     return state;
@@ -675,9 +627,16 @@ class App extends Component {
           localStorage.setItem(this.state.account+"loadedBlocksTop","")
           localStorage.setItem(this.state.account+"recentTxs","")
           localStorage.setItem(this.state.account+"transactionsByAddress","")
+          let importedMeta = null
+          try {
+            importedMeta = importPrivateKeyToLocalSigner(this.state.possibleNewPrivateKey)
+          } catch (importError) {
+            console.log("LocalSigner import failed, falling back to Dapparatus", importError)
+          }
           this.setState({
             possibleNewPrivateKey:false,
-            newPrivateKey:this.state.possibleNewPrivateKey,
+            newPrivateKey: importedMeta ? false : this.state.possibleNewPrivateKey,
+            metaAccount: importedMeta || this.state.metaAccount,
             recentTxs:[],
             transactionsByAddress:{},
             fullRecentTxs:[],
@@ -1209,9 +1168,10 @@ render() {
       onReady={(state) => {
         console.log("Transactions component is ready:", state);
         if(ERC20TOKEN){
-          state.nativeSend = state.send
-          //delete state.send
+          state.nativeSend = wrapNativeSend(state.send, () => this.state.metaAccount)
           state.send = tokenSend.bind(this)
+        } else {
+          state.send = wrapNativeSend(state.send, () => this.state.metaAccount)
         }
         console.log(state)
         this.setState(state)
@@ -1302,7 +1262,8 @@ render() {
 
   return (
     <I18nextProvider i18n={i18n}>
-    <div id="main" style={mainStyle}>
+    <ThemeProvider theme={theme}>
+    <div id="main" className="touch-targets" style={mainStyle}>
     <div style={innerStyle}>
     {extraHead}
     {networkOverlay}
@@ -1979,7 +1940,13 @@ render() {
             const tokenAddress = ERC20TOKEN === false ? 0 : this.state.contracts[ERC20TOKEN]._address;
             // -- Temp hacks
             const expirationTime = 365; // Hard-coded to 1 year link expiration.
-            const amountToSend = amount*10**18 ; // Conversion to wei
+            let amountToSend
+            try {
+              amountToSend = this.state.web3.utils.toWei(String(amount), 'ether');
+            } catch (err) {
+              cb(err)
+              return
+            }
             // --
             if(!ERC20TOKEN)
             {
@@ -1987,7 +1954,7 @@ render() {
                 this.setState({sendLink: randomHash,sendKey: randomWallet.privateKey},()=>{
                   console.log("STATE SAVED",this.state)
                 })
-                cb(receipt)
+                cb(null, receipt)
               })
             } else{
               this.state.tx(this.state.contracts[ERC20TOKEN].approve(this.state.contracts.Links._address, amountToSend),21000,false,0,async (approveReceipt)=>{
@@ -1996,7 +1963,7 @@ render() {
                   this.setState({sendLink: randomHash,sendKey: randomWallet.privateKey},()=>{
                     console.log("STATE SAVED",this.state)
                   })
-                  cb(sendReceipt)
+                  cb(null, sendReceipt)
                 })
               })
             }
@@ -2042,6 +2009,12 @@ render() {
               this.setState({recentTxs:[],transactionsByAddress:{}})
             }
             burnMetaAccount()
+            try {
+              burnLocalSignerKey()
+              this.setState({ metaAccount: metaAccountFromLocalSigner() })
+            } catch (burnError) {
+              console.log("LocalSigner burn failed", burnError)
+            }
           }}
           />
           </div>
@@ -2241,6 +2214,11 @@ render() {
     fallbackWeb3Provider={WEB3_PROVIDER}
     onUpdate={async (state) => {
       console.log("Dapparatus update",state)
+      if (state.metaAccount !== undefined) {
+        state.metaAccount = syncMetaAccount(state.metaAccount)
+      } else if (!state.metaAccount) {
+        state.metaAccount = metaAccountFromLocalSigner()
+      }
       //console.log("DAPPARATUS UPDATE",state)
       if(ERC20TOKEN){
         delete state.balance
@@ -2340,6 +2318,7 @@ render() {
     {eventParser}
     </div>
     </div>
+    </ThemeProvider>
     </I18nextProvider>
   )
 }
@@ -2353,7 +2332,15 @@ async function tokenSend(to,value,gasLimit,txData,cb){
 
   console.log("tokenSend")
 
-  let weiValue =  this.state.web3.utils.toWei(""+value, 'ether')
+  let weiValue
+  try {
+    weiValue = this.state.web3.utils.toWei(""+value, 'ether')
+  } catch (err) {
+    if(typeof cb === "function"){
+      cb(err)
+    }
+    return
+  }
 
   let setGasLimit = 60000
   if(typeof gasLimit == "function"){
@@ -2369,6 +2356,10 @@ async function tokenSend(to,value,gasLimit,txData,cb){
     data = txData
   }
 
+  if(typeof cb !== "function"){
+    return
+  }
+
   console.log("DAPPARATUS TOKEN SENDING WITH GAS LIMIT",setGasLimit)
 
   let result
@@ -2376,9 +2367,9 @@ async function tokenSend(to,value,gasLimit,txData,cb){
     console.log("sending with meta account:",this.state.metaAccount.address)
 
     let tx={
+      from: this.state.metaAccount.address,
       to:this.state.contracts[ERC20TOKEN]._address,
       value: 0,
-      gas: setGasLimit,
       gasPrice: Math.round(this.state.gwei * 1010101010)
     }
     if(data){
@@ -2386,17 +2377,40 @@ async function tokenSend(to,value,gasLimit,txData,cb){
     }else{
       tx.data = this.state.contracts[ERC20TOKEN].transfer(to,weiValue).encodeABI()
     }
+    try {
+      tx.gas = await estimateTxGas(this.state.web3, tx, setGasLimit)
+    } catch (err) {
+      cb(err)
+      return
+    }
     console.log("TX SIGNED TO METAMASK:",tx)
+    if (shouldUseBurnerCoreSend(this.state.metaAccount)) {
+      signTransactionWithBurnerCore(tx).then(raw => {
+        return sendSignedTransaction(XDAI_NETWORK, raw)
+      }).then(receipt => {
+        console.log("META RECEIPT",receipt)
+        if(receipt&&receipt.transactionHash&&!metaReceiptTracker[receipt.transactionHash]){
+          metaReceiptTracker[receipt.transactionHash] = true
+          cb(null, receipt)
+        }
+      }).catch((error) => {
+        console.log("EEEERRRRRRRROOOOORRRRR ======== >>>>>",error)
+        cb(error)
+        this.changeAlert({type: 'danger',message: error.toString()});
+      });
+      return
+    }
     this.state.web3.eth.accounts.signTransaction(tx, this.state.metaAccount.privateKey).then(signed => {
       console.log("SIGNED:",signed)
       this.state.web3.eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
         console.log("META RECEIPT",receipt)
         if(receipt&&receipt.transactionHash&&!metaReceiptTracker[receipt.transactionHash]){
           metaReceiptTracker[receipt.transactionHash] = true
-          cb(receipt)
+          cb(null, receipt)
         }
       }).on('error',(error)=>{
         console.log("ERRROROROROROR",error)
+        cb(error)
         let errorString = error.toString()
         if(errorString.indexOf("have enough funds")>=0){
           this.changeAlert({type: 'danger', message: 'Not enough funds to send message.'})
@@ -2404,6 +2418,9 @@ async function tokenSend(to,value,gasLimit,txData,cb){
           this.changeAlert({type: 'danger', message: errorString})
         }
       })
+    }).catch((error) => {
+      cb(error)
+      this.changeAlert({type: 'danger', message: error.toString()})
     });
 
   }else{
@@ -2428,10 +2445,16 @@ async function tokenSend(to,value,gasLimit,txData,cb){
     }
 
     console.log("sending with injected web3 account",txObject)
-    result = await this.state.web3.eth.sendTransaction(txObject)
+    try {
+      result = await this.state.web3.eth.sendTransaction(txObject)
+    } catch (error) {
+      cb(error)
+      this.changeAlert({type: 'danger', message: error.toString()})
+      return
+    }
 
     console.log("RES",result)
-    cb(result)
+    cb(null, result)
   }
 
 }

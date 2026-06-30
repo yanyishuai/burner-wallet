@@ -19,7 +19,19 @@ import xdaiImg from '../images/xdai.jpg';
 
 import InputRange from 'react-input-range';
 import 'react-input-range/lib/css/index.css';
+import {
+  Flex,
+  Box,
+  Button,
+  OutlineButton,
+  Input,
+  Field,
+  Icon,
+  Text,
+} from 'rimble-ui';
 import core from '../core';
+import estimateTxGas from '../services/estimateGas';
+import fetchMainnetGasPriceGwei from '../services/mainnetGasPrice';
 
 const MAINNET_CHAIN_ID = '1';
 const XDAI_CHAIN_ID = '100';
@@ -170,108 +182,171 @@ export default class Exchange extends React.Component {
 
 
       let extraGasUpDisplay = (
-        <div style={{padding:10,width:"100%",textAlign:'center',backgroundColor:"#ffdddd"}}>
-          <div style={{padding:10}}>You have DAI but no ETH for gas:</div>
-          <button style={this.props.buttonStyle.secondary}
-            className="btn btn-large"
-            onClick={()=>{
-              if(this.state.gettingGas){
-                this.props.changeAlert({type: 'warning',message: "Already trying to fuel up via xDai->ETH"});
-              }else if(this.props.network!="xDai"&&this.props.network!="Unknown"){
-                this.props.changeAlert({type: 'warning',message: "You must be on the xDai network to fuel xDai->ETH"});
-              }else{
-                this.setState({gettingGas:true,ethBalanceShouldBe:parseFloat(this.props.ethBalance)+0.001})
-                axios.get("https://ethgasstation.info/json/ethgasAPI.json", { crossdomain: true })
-                .catch((err)=>{
-                  console.log("Error getting gas price",err)
-                })
-                .then((response)=>{
-                  if(response && response.data.average>0&&response.data.average<1000){
-                    console.log("gas prices",response.data.average)
-                    let gwei = Math.round(response.data.average*100)/1000
-                    console.log("gwei:",gwei)
-                    let AMOUNTNEEDEDFORACOUPLETXS = Math.round(gwei*(1111000000*10) * 201000) // idk maybe enough for a couple transactions?
+        <Box p={3} width={1} textAlign="center" bg="#ffdddd">
+          <Text mb={3}>You have DAI but no ETH for gas:</Text>
+          <OutlineButton
+            onClick={() => {
+              if (this.state.gettingGas) {
+                this.props.changeAlert({
+                  type: 'warning',
+                  message: 'Already trying to fuel up via xDai->ETH',
+                });
+              } else if (
+                this.props.network != 'xDai' &&
+                this.props.network != 'Unknown'
+              ) {
+                this.props.changeAlert({
+                  type: 'warning',
+                  message: 'You must be on the xDai network to fuel xDai->ETH',
+                });
+              } else {
+                this.setState({
+                  gettingGas: true,
+                  ethBalanceShouldBe: parseFloat(this.props.ethBalance) + 0.001,
+                });
+                axios
+                  .get('https://ethgasstation.info/json/ethgasAPI.json', {
+                    crossdomain: true,
+                  })
+                  .catch(err => {
+                    console.log('Error getting gas price', err);
+                  })
+                  .then(response => {
+                    if (
+                      response &&
+                      response.data.average > 0 &&
+                      response.data.average < 1000
+                    ) {
+                      console.log('gas prices', response.data.average);
+                      let gwei = Math.round(response.data.average * 100) / 1000;
+                      console.log('gwei:', gwei);
+                      let AMOUNTNEEDEDFORACOUPLETXS = Math.round(
+                        gwei * (1111000000 * 10) * 201000
+                      );
 
-                    console.log("let's move ",AMOUNTNEEDEDFORACOUPLETXS,"from",this.props.xdaiBalance,"to",this.props.ethBalance)
+                      console.log(
+                        "let's move ",
+                        AMOUNTNEEDEDFORACOUPLETXS,
+                        'from',
+                        this.props.xdaiBalance,
+                        'to',
+                        this.props.ethBalance
+                      );
 
-                    let gasInEth = this.props.web3.utils.fromWei(""+AMOUNTNEEDEDFORACOUPLETXS,'ether')
-                    console.log("gasInEth",gasInEth)
-                    let gasInXDai = Math.floor(this.props.ethprice*gasInEth*100)/100
+                      let gasInEth = this.props.web3.utils.fromWei(
+                        '' + AMOUNTNEEDEDFORACOUPLETXS,
+                        'ether'
+                      );
+                      console.log('gasInEth', gasInEth);
+                      let gasInXDai =
+                        Math.floor(this.props.ethprice * gasInEth * 100) / 100;
 
-                    if(gasInXDai>0.5) gasInXDai = 0.5
-                    if(this.props.xdaiBalance < gasInXDai) gasInXDai = this.props.xdaiBalance-0.005
+                      if (gasInXDai > 0.5) gasInXDai = 0.5;
+                      if (this.props.xdaiBalance < gasInXDai)
+                        gasInXDai = this.props.xdaiBalance - 0.005;
 
-                    console.log("gasInXDai",gasInXDai)
-                    let gasEmitterContract
-                    if(this.props.network=="xDai"){
-                      try{
-                        gasEmitterContract = new this.props.web3.eth.Contract(require("../contracts/Emitter.abi.js"),require("../contracts/Emitter.address.js"))
-                      }catch(e){
-                        console.log("ERROR LOADING Emitter Contract",e)
-                      }
-                    }
-                    if(gasEmitterContract){
-                      let amountInWei = this.props.web3.utils.toWei(""+gasInXDai,'ether')
-
-                      if(this.state.xdaiMetaAccount){
-                        //send funds using metaaccount on mainnet
-
-                        let paramsObject = {
-                          from: this.state.daiAddress,
-                          value: amountInWei,
-                          gas: 120000,
-                          gasPrice: Math.round(1.1 * 1000000000)
+                      console.log('gasInXDai', gasInXDai);
+                      let gasEmitterContract;
+                      if (this.props.network == 'xDai') {
+                        try {
+                          gasEmitterContract = new this.props.web3.eth.Contract(
+                            require('../contracts/Emitter.abi.js'),
+                            require('../contracts/Emitter.address.js')
+                          );
+                        } catch (e) {
+                          console.log('ERROR LOADING Emitter Contract', e);
                         }
-                        console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
+                      }
+                      if (gasEmitterContract) {
+                        let amountInWei = this.props.web3.utils.toWei(
+                          '' + gasInXDai,
+                          'ether'
+                        );
 
-                        paramsObject.to = gasEmitterContract._address || gasEmitterContract.options.address
-                        paramsObject.data = gasEmitterContract.methods.goToETH().encodeABI()
+                        if (this.state.xdaiMetaAccount) {
+                          let paramsObject = {
+                            from: this.state.daiAddress,
+                            value: amountInWei,
+                            gasPrice: Math.round(1.1 * 1000000000),
+                          };
+                          console.log(
+                            '====================== >>>>>>>>> paramsObject!!!!!!!',
+                            paramsObject
+                          );
 
-                        console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
+                          paramsObject.to =
+                            gasEmitterContract._address ||
+                            gasEmitterContract.options.address;
+                          paramsObject.data =
+                            gasEmitterContract.methods.goToETH().encodeABI();
 
+                          console.log('TTTTTTTTTTTTTTTTTTTTTX', paramsObject);
 
-                        this.state.xdaiweb3.eth.accounts.signTransaction(paramsObject, this.state.xdaiMetaAccount.privateKey).then(signed => {
-                          console.log("========= >>> SIGNED",signed)
-                            this.state.xdaiweb3.eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
-                              console.log("META RECEIPT",receipt)
-                              if(receipt&&receipt.transactionHash&&!metaReceiptTracker[receipt.transactionHash]){
-                                metaReceiptTracker[receipt.transactionHash] = true
-                                //actually, let's wait for the eth balance to change
-                                //this.setState({gettingGas:false})
+                          estimateTxGas(
+                            this.state.xdaiweb3,
+                            paramsObject,
+                            120000
+                          ).then(gas => {
+                            paramsObject.gas = gas;
+                            this.state.xdaiweb3.eth.accounts
+                              .signTransaction(
+                                paramsObject,
+                                this.state.xdaiMetaAccount.privateKey
+                              )
+                              .then(signed => {
+                                console.log('========= >>> SIGNED', signed);
+                                this.state.xdaiweb3.eth
+                                  .sendSignedTransaction(signed.rawTransaction)
+                                  .on('receipt', receipt => {
+                                    console.log('META RECEIPT', receipt);
+                                    if (
+                                      receipt &&
+                                      receipt.transactionHash &&
+                                      !metaReceiptTracker[receipt.transactionHash]
+                                    ) {
+                                      metaReceiptTracker[
+                                        receipt.transactionHash
+                                      ] = true;
+                                    }
+                                  })
+                                  .on('error', err => {
+                                    console.log(
+                                      'EEEERRRRRRRROOOOORRRRR ======== >>>>>',
+                                      err
+                                    );
+                                    this.props.changeAlert({
+                                      type: 'danger',
+                                      message: err.toString(),
+                                    });
+                                    this.setState({ gettingGas: false });
+                                  })
+                                  .then(console.log);
+                              });
+                          });
+                        } else {
+                          console.log('Use MetaMask to go xDai to ETH');
+                          this.props.tx(
+                            gasEmitterContract.methods.goToETH(),
+                            120000,
+                            0,
+                            amountInWei,
+                            receipt => {
+                              if (receipt) {
+                                console.log('GAS UP COMPLETE?!?', receipt);
                               }
-                            }).on('error', (err)=>{
-                              console.log("EEEERRRRRRRROOOOORRRRR ======== >>>>>",err)
-                              this.props.changeAlert({type: 'danger',message: err.toString()});
-                              this.setState({gettingGas:false})
-                            }).then(console.log)
-                        });
-
-                      }else{
-                        console.log("Use MetaMask to go xDai to ETH")
-                        this.props.tx(
-                          gasEmitterContract.methods.goToETH()
-                        ,120000,0,amountInWei,(receipt)=>{
-                          if(receipt){
-                            console.log("GAS UP COMPLETE?!?",receipt)
-                            //this.setState({gettingGas:false})
-                            //window.location = "/"+receipt.contractAddress
-                          }
-                        })
+                            }
+                          );
+                        }
                       }
                     }
-                  }
-                })
+                  });
               }
-
-
-
             }}
           >
-           {getGasText}
-          </button>
-        </div>
-
-      )
+            {getGasText}
+          </OutlineButton>
+        </Box>
+      );
       this.setState({extraGasUpDisplay})
     }
 
@@ -507,77 +582,83 @@ export default class Exchange extends React.Component {
     return (this.state.daiSendToAddress && this.state.daiSendToAddress.length === 42 && parseFloat(this.state.daiSendAmount)>0 && parseFloat(this.state.daiSendAmount) <= parseFloat(this.props.daiBalance))
   }
   transferDai(destination,amount,message,cb) {
-    axios.get("https://ethgasstation.info/json/ethgasAPI.json", { crossdomain: true })
+    const web3 = core.getWeb3(MAINNET_CHAIN_ID);
+    fetchMainnetGasPriceGwei(web3, GASBOOSTPRICE)
     .catch((err)=>{
       console.log("Error getting gas price",err)
+      this.props.changeAlert({type: 'danger',message: "Could not fetch gas price. Please try again."});
+      this.setState({
+        daiToXdaiMode:false,
+        loaderBarColor:"#FFFFFF",
+        loaderBarStatusText:"",
+      })
     })
-    .then((response)=>{
-      if(response && response.data.average>0&&response.data.average<1000){
+    .then((gwei)=>{
+      if(gwei === undefined){
+        return
+      }
+
+      this.setState({
+        loaderBarColor:"#f5eb4a",
+        loaderBarStatusText:message,
+      })
+
+      if(this.state.mainnetMetaAccount){
+        //send funds using metaaccount on mainnet
+
+        let paramsObject = {
+          from: this.state.daiAddress,
+          value: 0,
+          gasPrice: Math.round(gwei * 1000000000)
+        }
+        console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
+
+        paramsObject.to = this.props.daiContract.options.address
+        paramsObject.data = this.props.daiContract.methods.transfer(
+          destination,
+          web3.utils.toWei(""+amount,"ether")
+        ).encodeABI()
+
+        console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
+
+        estimateTxGas(web3, paramsObject, 100000).then((gas) => {
+          paramsObject.gas = gas;
+        web3.eth.accounts.signTransaction(paramsObject, this.state.mainnetMetaAccount.privateKey).then(signed => {
+          console.log("========= >>> SIGNED",signed)
+            web3.eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
+              console.log("META RECEIPT",receipt)
+              if(receipt&&receipt.transactionHash&&!metaReceiptTracker[receipt.transactionHash]){
+                metaReceiptTracker[receipt.transactionHash] = true
+                cb(receipt)
+              }
+            }).on('error', (err)=>{
+              console.log("EEEERRRRRRRROOOOORRRRR ======== >>>>>",err)
+              this.props.changeAlert({type: 'danger',message: err.toString()});
+            }).then(console.log)
+        });
+        });
+
+      }else{
+        //send funds using metamask (or other injected web3 ... should be checked and on mainnet)
+        console.log("Depositing to ",toDaiBridgeAccount)
 
         this.setState({
           loaderBarColor:"#f5eb4a",
           loaderBarStatusText:message,
         })
 
-        response.data.average=response.data.average + (response.data.average*GASBOOSTPRICE)
-        let gwei = Math.round(response.data.average*100)/1000
-        if(this.state.mainnetMetaAccount){
-          //send funds using metaaccount on mainnet
-
-          let paramsObject = {
-            from: this.state.daiAddress,
-            value: 0,
-            gas: 100000,
-            gasPrice: Math.round(gwei * 1000000000)
+        let metaMaskDaiContract = new this.props.web3.eth.Contract(this.props.daiContract._jsonInterface, this.props.daiContract._address || this.props.daiContract.options.address)
+        console.log("CURRENT DAI CONTRACT YOU NEED TO GET ABI FROM:",this.props.daiContract)
+        this.props.tx(metaMaskDaiContract.methods.transfer(
+          destination,
+          web3.utils.toWei(""+amount,"ether")
+          ///TODO LET ME PASS IN A CERTAIN AMOUNT OF GAS INSTEAD OF LEANING BACK ON THE <GAS> COMPONENT!!!!!
+        ),120000,0,0,(receipt)=>{
+          if(receipt){
+            console.log("SESSION WITHDRAWN:",receipt)
+            cb(receipt)
           }
-          console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
-
-          paramsObject.to = this.props.daiContract.options.address
-          paramsObject.data = this.props.daiContract.methods.transfer(
-            destination,
-            core.getWeb3(MAINNET_CHAIN_ID).utils.toWei(""+amount,"ether")
-          ).encodeABI()
-
-          console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
-
-          core.getWeb3(MAINNET_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.mainnetMetaAccount.privateKey).then(signed => {
-            console.log("========= >>> SIGNED",signed)
-              core.getWeb3(MAINNET_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
-                console.log("META RECEIPT",receipt)
-                if(receipt&&receipt.transactionHash&&!metaReceiptTracker[receipt.transactionHash]){
-                  metaReceiptTracker[receipt.transactionHash] = true
-                  cb(receipt)
-                }
-              }).on('error', (err)=>{
-                console.log("EEEERRRRRRRROOOOORRRRR ======== >>>>>",err)
-                this.props.changeAlert({type: 'danger',message: err.toString()});
-              }).then(console.log)
-          });
-
-        }else{
-          //send funds using metamask (or other injected web3 ... should be checked and on mainnet)
-          console.log("Depositing to ",toDaiBridgeAccount)
-
-          this.setState({
-            loaderBarColor:"#f5eb4a",
-            loaderBarStatusText:message,
-          })
-
-          let metaMaskDaiContract = new this.props.web3.eth.Contract(this.props.daiContract._jsonInterface, this.props.daiContract._address || this.props.daiContract.options.address)
-          console.log("CURRENT DAI CONTRACT YOU NEED TO GET ABI FROM:",this.props.daiContract)
-          this.props.tx(metaMaskDaiContract.methods.transfer(
-            destination,
-            core.getWeb3(MAINNET_CHAIN_ID).utils.toWei(""+amount,"ether")
-            ///TODO LET ME PASS IN A CERTAIN AMOUNT OF GAS INSTEAD OF LEANING BACK ON THE <GAS> COMPONENT!!!!!
-          ),120000,0,0,(receipt)=>{
-            if(receipt){
-              console.log("SESSION WITHDRAWN:",receipt)
-              cb(receipt)
-            }
-          })
-        }
-      }else{
-        console.log("ERRORed RESPONSE FROM ethgasstation",response)
+        })
       }
     })
   }
@@ -703,7 +784,6 @@ export default class Exchange extends React.Component {
           let paramsObject = {
             from: this.state.daiAddress,
             value: amount,
-            gas: 240000,
             gasPrice: Math.round(gwei * 1000000000)
           }
           console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
@@ -717,6 +797,8 @@ export default class Exchange extends React.Component {
 
           console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
+          estimateTxGas(core.getWeb3(MAINNET_CHAIN_ID), paramsObject, 240000).then((gas) => {
+            paramsObject.gas = gas;
           core.getWeb3(MAINNET_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.mainnetMetaAccount.privateKey).then(signed => {
             console.log("========= >>> SIGNED",signed)
               core.getWeb3(MAINNET_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
@@ -729,6 +811,7 @@ export default class Exchange extends React.Component {
                 console.log("EEEERRRRRRRROOOOORRRRR ======== >>>>>",err)
                 this.props.changeAlert({type: 'danger',message: err.toString()});
               }).then(console.log)
+          });
           });
 
         }else{
@@ -777,38 +860,54 @@ export default class Exchange extends React.Component {
     let {xdaiToDendaiMode,daiToXdaiMode,ethToDaiMode} = this.state
 
     let ethCancelButton = (
-      <span style={{padding:10,whiteSpace:"nowrap"}}>
-        <a href="#" style={{color:"#000000"}} onClick={()=>{
-          this.setState({amount:"",ethToDaiMode:false})
-        }}>
-          <i className="fas fa-times"/> {i18n.t('cancel')}
-        </a>
-      </span>
-    )
+      <OutlineButton
+        onClick={() => {
+          this.setState({ amount: '', ethToDaiMode: false });
+        }}
+      >
+        <Icon name="Close" mr={1} />
+        {i18n.t('cancel')}
+      </OutlineButton>
+    );
     let daiCancelButton = (
-      <span style={{padding:10,whiteSpace:"nowrap"}}>
-        <a href="#" style={{color:"#000000"}} onClick={()=>{
-          this.setState({amount:"",daiToXdaiMode:false})
-        }}>
-          <i className="fas fa-times"/> {i18n.t('cancel')}
-        </a>
-      </span>
-    )
+      <OutlineButton
+        onClick={() => {
+          this.setState({ amount: '', daiToXdaiMode: false });
+        }}
+      >
+        <Icon name="Close" mr={1} />
+        {i18n.t('cancel')}
+      </OutlineButton>
+    );
     let xdaiCancelButton = (
-      <span style={{padding:10,whiteSpace:"nowrap"}}>
-        <a href="#" style={{color:"#000000"}} onClick={()=>{
-          this.setState({amount:"",xdaiToDendaiMode:false})
-        }}>
-          <i className="fas fa-times"/> {i18n.t('cancel')}
-        </a>
-      </span>
-    )
+      <OutlineButton
+        onClick={() => {
+          this.setState({ amount: '', xdaiToDendaiMode: false });
+        }}
+      >
+        <Icon name="Close" mr={1} />
+        {i18n.t('cancel')}
+      </OutlineButton>
+    );
 
     let buttonsDisabled = (
       xdaiToDendaiMode=="sending" || xdaiToDendaiMode=="withdrawing" || xdaiToDendaiMode=="depositing" ||
       daiToXdaiMode=="sending" || daiToXdaiMode=="withdrawing" || daiToXdaiMode=="depositing" ||
       ethToDaiMode=="sending" || ethToDaiMode=="depositing" || ethToDaiMode=="withdrawing"
     )
+
+    const dismissButton = (onDismiss) => (
+      <OutlineButton
+        ml={3}
+        onClick={(event) => {
+          event.preventDefault();
+          onDismiss();
+        }}
+      >
+        <Icon name="Close" mr={1} />
+        dismiss
+      </OutlineButton>
+    );
 
     let adjustedFontSize = Math.round((Math.min(document.documentElement.clientWidth,600)/600)*24)
     let adjustedTop = Math.round((Math.min(document.documentElement.clientWidth,600)/600)*-20)+9
@@ -819,16 +918,29 @@ export default class Exchange extends React.Component {
     if(this.props.ERC20TOKEN){
       if(xdaiToDendaiMode=="sending" || xdaiToDendaiMode=="withdrawing" || xdaiToDendaiMode=="depositing"){
         xdaiToDendaiDisplay = (
-          <div className="content ops row" style={{position:"relative"}}>
-            <button style={{width:Math.min(100,this.state.loaderBarPercent)+"%",backgroundColor:this.state.loaderBarColor,color:"#000000"}}
-              className="btn btn-large"
+          <Box position="relative" width={1} minHeight="48px">
+            <Box
+              position="absolute"
+              left={0}
+              top={0}
+              bottom={0}
+              width={`${Math.min(100, this.state.loaderBarPercent)}%`}
+              bg={this.state.loaderBarColor}
+            />
+            <Box
+              position="absolute"
+              width={1}
+              textAlign="center"
+              style={{
+                fontSize: adjustedFontSize,
+                top: adjustedTop,
+                opacity: 0.95,
+              }}
             >
-            </button>
-            <div style={{position:'absolute',left:"50%",width:"100%",marginLeft:"-50%",fontSize:adjustedFontSize,top:adjustedTop,opacity:0.95,textAlign:"center"}}>
               {this.state.loaderBarStatusText}
-            </div>
-          </div>
-        )
+            </Box>
+          </Box>
+        );
 
       }else if(xdaiToDendaiMode=="deposit"){
 
@@ -838,37 +950,30 @@ export default class Exchange extends React.Component {
             <div className="content ops row" style={{textAlign:'center'}}>
               <div className="col-12 p-1">
                 Error: MetaMask network must be: <span style={{fontWeight:"bold",marginLeft:5}}>dai.poa.network</span>
-                <a href="#" onClick={()=>{this.setState({xdaiToDendaiMode:false})}} style={{marginLeft:40,color:"#666666"}}>
-                  <i className="fas fa-times"/> dismiss
-                </a>
+                {dismissButton(() => this.setState({ xdaiToDendaiMode: false }))}
               </div>
             </div>
           )
         }else{
           xdaiToDendaiDisplay = (
-            <div className="content ops row">
-
-              <div className="col-1 p-1"  style={colStyle}>
-                <i className="fas fa-arrow-up"  />
-              </div>
-              <div className="col-5 p-1" style={colStyle}>
-                <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-                <div className="input-group">
-                  <div className="input-group-prepend">
-                    <div className="input-group-text">$</div>
-                  </div>
-                  <input type="number" step="0.1" className="form-control" placeholder="0.00" value={this.state.amount}
-                         onChange={event => this.updateState('amount', event.target.value)} />
-                </div>
-                </Scaler>
-              </div>
-              <div className="col-3 p-1"  style={colStyle}>
-                <Scaler config={{startZoomAt:650,origin:"0% 85%"}}>
-                {xdaiCancelButton}
-                </Scaler>
-              </div>
-              <div className="col-3 p-1">
-                <button className="btn btn-large w-100"  disabled={buttonsDisabled} style={this.props.buttonStyle.primary} onClick={async ()=>{
+            <Flex alignItems="center" px={3} py={2}>
+              <Icon name="ArrowUpward" mr={2} />
+              <Input
+                type="number"
+                step="0.1"
+                placeholder="$0.00"
+                value={this.state.amount}
+                onChange={event =>
+                  this.updateState('amount', event.target.value)
+                }
+                width={1}
+                mr={2}
+              />
+              <Box mr={2}>{xdaiCancelButton}</Box>
+              <Button
+                width="120px"
+                disabled={buttonsDisabled}
+                onClick={async () => {
 
                   let amountOfxDaiToDeposit = core.getWeb3(XDAI_CHAIN_ID).utils.toWei(""+this.state.amount,'ether')
                   console.log("Using DenDai contract to deposit "+amountOfxDaiToDeposit+" xDai")
@@ -892,7 +997,6 @@ export default class Exchange extends React.Component {
                     let paramsObject = {
                       from: this.state.daiAddress,
                       value: amountOfxDaiToDeposit,
-                      gas: 120000,
                       gasPrice: Math.round(1.1 * 1000000000)
                     }
                     console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
@@ -902,6 +1006,8 @@ export default class Exchange extends React.Component {
 
                     console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
+                    estimateTxGas(core.getWeb3(XDAI_CHAIN_ID), paramsObject, 120000).then((gas) => {
+                      paramsObject.gas = gas;
                     core.getWeb3(XDAI_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.xdaiMetaAccount.privateKey).then(signed => {
                       console.log("========= >>> SIGNED",signed)
                         core.getWeb3(XDAI_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
@@ -917,6 +1023,7 @@ export default class Exchange extends React.Component {
                           this.props.changeAlert({type: 'danger',message: err.toString()});
                         }).then(console.log)
                     });
+                    });
 
                   }else{
                     console.log("Use MetaMask to withdraw "+this.props.ERC20NAME+" to xDai")
@@ -930,15 +1037,13 @@ export default class Exchange extends React.Component {
                     })
                   }
 
-                }}>
-                  <Scaler config={{startZoomAt:600,origin:"10% 50%"}}>
-                    <i className="fas fa-arrow-up" /> Send
-                  </Scaler>
-                </button>
-
-              </div>
-            </div>
-          )
+                }}
+              >
+                <Icon name="ArrowUpward" mr={1} />
+                Send
+              </Button>
+            </Flex>
+          );
         }
       }else if(xdaiToDendaiMode=="withdraw"){
         console.log("CHECKING META ACCOUNT ",this.state.xdaiMetaAccount,this.props.network)
@@ -947,9 +1052,7 @@ export default class Exchange extends React.Component {
             <div className="content ops row" style={{textAlign:'center'}}>
               <div className="col-12 p-1">
                 Error: MetaMask network must be: <span style={{fontWeight:"bold",marginLeft:5}}>dai.poa.network</span>
-                <a href="#" onClick={()=>{this.setState({xdaiToDendaiMode:false})}} style={{marginLeft:40,color:"#666666"}}>
-                  <i className="fas fa-times"/> dismiss
-                </a>
+                {dismissButton(() => this.setState({ xdaiToDendaiMode: false }))}
               </div>
             </div>
           )
@@ -972,30 +1075,25 @@ export default class Exchange extends React.Component {
 
 
           xdaiToDendaiDisplay = (
-            <div>
-              <div className="content ops row">
-
-                <div className="col-1 p-1"  style={colStyle}>
-                  <i className="fas fa-arrow-down"  />
-                </div>
-                <div className="col-5 p-1" style={colStyle}>
-                  <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-                  <div className="input-group">
-                    <div className="input-group-prepend">
-                      <div className="input-group-text">$</div>
-                    </div>
-                    <input type="number" step="0.1" className="form-control" placeholder="0.00" value={this.state.amount}
-                           onChange={event => this.updateState('amount', event.target.value)} />
-                  </div>
-                  </Scaler>
-                </div>
-                <div className="col-3 p-1"  style={colStyle}>
-                  <Scaler config={{startZoomAt:650,origin:"0% 85%"}}>
-                  {xdaiCancelButton}
-                  </Scaler>
-                </div>
-                <div className="col-3 p-1">
-                  <button className="btn btn-large w-100"  disabled={buttonsDisabled} style={this.props.buttonStyle.primary} onClick={async ()=>{
+            <Box>
+              <Flex alignItems="center" px={3} py={2}>
+                <Icon name="ArrowDownward" mr={2} />
+                <Input
+                  type="number"
+                  step="0.1"
+                  placeholder="$0.00"
+                  value={this.state.amount}
+                  onChange={event =>
+                    this.updateState('amount', event.target.value)
+                  }
+                  width={1}
+                  mr={2}
+                />
+                <Box mr={2}>{xdaiCancelButton}</Box>
+                <Button
+                  width="120px"
+                  disabled={buttonsDisabled}
+                  onClick={async () => {
 
                     let amountOfxDaiToWithdraw = core.getWeb3(XDAI_CHAIN_ID).utils.toWei(""+this.state.amount,'ether')
                     console.log("Using "+this.props.ERC20NAME+" contract to withdraw "+amountOfxDaiToWithdraw+" xDai")
@@ -1019,7 +1117,6 @@ export default class Exchange extends React.Component {
                       let paramsObject = {
                         from: this.state.daiAddress,
                         value: 0,
-                        gas: 120000,
                         gasPrice: Math.round(1.1 * 1000000000)
                       }
                       console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
@@ -1029,6 +1126,8 @@ export default class Exchange extends React.Component {
 
                       console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
+                      estimateTxGas(core.getWeb3(XDAI_CHAIN_ID), paramsObject, 120000).then((gas) => {
+                        paramsObject.gas = gas;
                       core.getWeb3(XDAI_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.xdaiMetaAccount.privateKey).then(signed => {
                         console.log("========= >>> SIGNED",signed)
                           core.getWeb3(XDAI_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
@@ -1044,6 +1143,7 @@ export default class Exchange extends React.Component {
                             this.props.changeAlert({type: 'danger',message: err.toString()});
                           }).then(console.log)
                       });
+                      });
 
                     }else{
                       console.log("Use MetaMask to withdraw "+this.props.ERC20NAME+" to xDai")
@@ -1057,17 +1157,15 @@ export default class Exchange extends React.Component {
                       })
                     }
 
-                  }}>
-                    <Scaler config={{startZoomAt:600,origin:"10% 50%"}}>
-                      <i className="fas fa-arrow-down" /> Send
-                    </Scaler>
-                  </button>
-
-                </div>
-              </div>
+                  }}
+                >
+                  <Icon name="ArrowDownward" mr={1} />
+                  Send
+                </Button>
+              </Flex>
               {extraWithdrawInfo}
-            </div>
-          )
+            </Box>
+          );
         }
       }else{
 
@@ -1075,29 +1173,30 @@ export default class Exchange extends React.Component {
 
 
         xdaiToDendaiDisplay = (
-           <div className="content ops row">
-
-             <div className="col-6 p-1">
-               <button className="btn btn-large w-100"  style={this.props.buttonStyle.primary} disabled={buttonsDisabled}  onClick={()=>{
-                 this.setState({xdaiToDendaiMode:"deposit"})
-               }}>
-                  <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-                    <i className="fas fa-arrow-up"  /> xDai to {this.props.ERC20NAME}
-                  </Scaler>
-               </button>
-             </div>
-
-             <div className="col-6 p-1">
-               <button className="btn btn-large w-100"  style={this.props.buttonStyle.primary} disabled={buttonsDisabled}  onClick={()=>{
-                 this.setState({xdaiToDendaiMode:"withdraw"})
-               }}>
-                 <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-                  <i className="fas fa-arrow-down" /> {this.props.ERC20NAME} to xDai
-                 </Scaler>
-               </button>
-             </div>
-           </div>
-        )
+          <Flex width={1} px={3}>
+            <Button
+              width={1}
+              mr={2}
+              icon="ArrowUpward"
+              disabled={buttonsDisabled}
+              onClick={() => {
+                this.setState({ xdaiToDendaiMode: 'deposit' });
+              }}
+            >
+              xDai to {this.props.ERC20NAME}
+            </Button>
+            <Button
+              width={1}
+              icon="ArrowDownward"
+              disabled={buttonsDisabled}
+              onClick={() => {
+                this.setState({ xdaiToDendaiMode: 'withdraw' });
+              }}
+            >
+              {this.props.ERC20NAME} to xDai
+            </Button>
+          </Flex>
+        );
       }
 
       let link = ""
@@ -1122,11 +1221,13 @@ export default class Exchange extends React.Component {
                 </Scaler>
             </div>
             <div className="col-2 p-1" style={{marginTop:8}}>
-              <button className="btn btn-large w-100" disabled={buttonsDisabled} style={this.props.buttonStyle.secondary} onClick={this.props.goBack}>
-                <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-                  <i className="fas fa-arrow-right"></i>
-                </Scaler>
-              </button>
+              <OutlineButton
+                width={1}
+                icon="ArrowForward"
+                icononly
+                disabled={buttonsDisabled}
+                onClick={this.props.goBack}
+              />
             </div>
 
           </div>
@@ -1142,16 +1243,29 @@ export default class Exchange extends React.Component {
     //console.log("daiToXdaiMode",daiToXdaiMode)
     if(daiToXdaiMode=="sending" || daiToXdaiMode=="withdrawing" || daiToXdaiMode=="depositing"){
       daiToXdaiDisplay = (
-        <div className="content ops row" style={{position:"relative"}}>
-          <button style={{width:Math.min(100,this.state.loaderBarPercent)+"%",backgroundColor:this.state.loaderBarColor,color:"#000000"}}
-            className="btn btn-large"
+        <Box position="relative" width={1} minHeight="48px">
+          <Box
+            position="absolute"
+            left={0}
+            top={0}
+            bottom={0}
+            width={`${Math.min(100, this.state.loaderBarPercent)}%`}
+            bg={this.state.loaderBarColor}
+          />
+          <Box
+            position="absolute"
+            width={1}
+            textAlign="center"
+            style={{
+              fontSize: adjustedFontSize,
+              top: adjustedTop,
+              opacity: 0.95,
+            }}
           >
-          </button>
-          <div style={{position:'absolute',left:"50%",width:"100%",marginLeft:"-50%",fontSize:adjustedFontSize,top:adjustedTop,opacity:0.95,textAlign:"center"}}>
             {this.state.loaderBarStatusText}
-          </div>
-        </div>
-      )
+          </Box>
+        </Box>
+      );
 
     }else if(daiToXdaiMode=="deposit"){
       if(!this.state.mainnetMetaAccount && this.props.network!="Mainnet"){
@@ -1159,9 +1273,7 @@ export default class Exchange extends React.Component {
           <div className="content ops row" style={{textAlign:'center'}}>
             <div className="col-12 p-1">
               Error: MetaMask network must be: <span style={{fontWeight:"bold",marginLeft:5}}>Mainnet</span>
-              <a href="#" onClick={()=>{this.setState({daiToXdaiMode:false})}} style={{marginLeft:40,color:"#666666"}}>
-                <i className="fas fa-times"/> dismiss
-              </a>
+              {dismissButton(() => this.setState({ daiToXdaiMode: false }))}
             </div>
           </div>
         )
@@ -1170,48 +1282,50 @@ export default class Exchange extends React.Component {
           <div className="content ops row" style={{textAlign:'center'}}>
             <div className="col-12 p-1">
               Error: You must have ETH to send DAI.
-              <a href="#" onClick={()=>{this.setState({daiToXdaiMode:false})}} style={{marginLeft:40,color:"#666666"}}>
-                <i className="fas fa-times"/> dismiss
-              </a>
+              {dismissButton(() => this.setState({ daiToXdaiMode: false }))}
             </div>
           </div>
         )
       }else{
         daiToXdaiDisplay = (
-          <div className="content ops row">
-            <div className="col-1 p-1"  style={colStyle}>
-              <i className="fas fa-arrow-up"  />
-            </div>
-            <div className="col-6 p-1" style={colStyle}>
-              <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-              <div className="input-group">
-                <div className="input-group-prepend">
-                  <div className="input-group-text">$</div>
-                </div>
-                <input type="number" step="0.1" className="form-control" placeholder="0.00" value={this.state.amount}
-                       onChange={event => this.updateState('amount', event.target.value)} />
-                 <div className="input-group-append" onClick={() => {
-                    this.setState({amount: Math.floor(this.props.daiBalance*100)/100 },()=>{
-                      this.setState({ canSendDai: this.canSendDai(), canSendEth: this.canSendEth(), canSendXdai: this.canSendXdai() })
-                    })
-                 }}>
-                   <span className="input-group-text" id="basic-addon2" style={this.props.buttonStyle.secondary}>
-                     max
-                   </span>
-                 </div>
-              </div>
-              </Scaler>
-            </div>
-            <div className="col-2 p-1"  style={colStyle}>
-              <Scaler config={{startZoomAt:650,origin:"0% 85%"}}>
-              {daiCancelButton}
-              </Scaler>
-            </div>
-            <div className="col-3 p-1">
-
-              <button className="btn btn-large w-100"  disabled={buttonsDisabled}
-                style={this.props.buttonStyle.primary}
-                onClick={()=>{
+          <Flex alignItems="center" px={3} py={2}>
+            <Icon name="ArrowUpward" mr={2} />
+            <Flex flex={1} mr={2}>
+              <Input
+                type="number"
+                step="0.1"
+                placeholder="$0.00"
+                value={this.state.amount}
+                onChange={event =>
+                  this.updateState('amount', event.target.value)
+                }
+                width={1}
+              />
+              <OutlineButton
+                ml={2}
+                onClick={() => {
+                  this.setState(
+                    {
+                      amount: Math.floor(this.props.daiBalance * 100) / 100,
+                    },
+                    () => {
+                      this.setState({
+                        canSendDai: this.canSendDai(),
+                        canSendEth: this.canSendEth(),
+                        canSendXdai: this.canSendXdai(),
+                      });
+                    }
+                  );
+                }}
+              >
+                max
+              </OutlineButton>
+            </Flex>
+            <Box mr={2}>{daiCancelButton}</Box>
+            <Button
+              width="120px"
+              disabled={buttonsDisabled}
+              onClick={() => {
                 console.log("AMOUNT:",this.state.amount,"DAI BALANCE:",this.props.daiBalance)
 
                 this.setState({
@@ -1237,15 +1351,13 @@ export default class Exchange extends React.Component {
                     }
                   })
                 })
-              }}>
-                <Scaler config={{startZoomAt:600,origin:"10% 50%"}}>
-                  <i className="fas fa-arrow-up" /> Send
-                </Scaler>
-              </button>
-
-            </div>
-          </div>
-        )
+              }}
+            >
+              <Icon name="ArrowUpward" mr={1} />
+              Send
+            </Button>
+          </Flex>
+        );
       }
     } else if(daiToXdaiMode=="withdraw"){
       console.log("CHECKING META ACCOUNT ",this.state.xdaiMetaAccount,this.props.network)
@@ -1254,46 +1366,51 @@ export default class Exchange extends React.Component {
           <div className="content ops row" style={{textAlign:'center'}}>
             <div className="col-12 p-1">
               Error: MetaMask network must be: <span style={{fontWeight:"bold",marginLeft:5}}>dai.poa.network</span>
-              <a href="#" onClick={()=>{this.setState({daiToXdaiMode:false})}} style={{marginLeft:40,color:"#666666"}}>
-                <i className="fas fa-times"/> dismiss
-              </a>
+              {dismissButton(() => this.setState({ daiToXdaiMode: false }))}
             </div>
           </div>
         )
       }else{
         daiToXdaiDisplay = (
-          <div className="content ops row">
-
-            <div className="col-1 p-1"  style={colStyle}>
-              <i className="fas fa-arrow-down"  />
-            </div>
-            <div className="col-6 p-1" style={colStyle}>
-              <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-              <div className="input-group">
-                <div className="input-group-prepend">
-                  <div className="input-group-text">$</div>
-                </div>
-                <input type="number" step="0.1" className="form-control" placeholder="0.00" value={this.state.amount}
-                       onChange={event => this.updateState('amount', event.target.value)} />
-                   <div className="input-group-append" onClick={() => {
-                      this.setState({amount: Math.floor((this.props.xdaiBalance-0.01)*100)/100 },()=>{
-                        this.setState({ canSendDai: this.canSendDai(), canSendEth: this.canSendEth(), canSendXdai: this.canSendXdai() })
-                      })
-                   }}>
-                     <span className="input-group-text" id="basic-addon2" style={this.props.buttonStyle.secondary}>
-                       max
-                     </span>
-                   </div>
-              </div>
-              </Scaler>
-            </div>
-            <div className="col-2 p-1"  style={colStyle}>
-              <Scaler config={{startZoomAt:650,origin:"0% 85%"}}>
-              {daiCancelButton}
-              </Scaler>
-            </div>
-            <div className="col-3 p-1">
-              <button className="btn btn-large w-100"  disabled={buttonsDisabled} style={this.props.buttonStyle.primary} onClick={()=>{
+          <Flex alignItems="center" px={3} py={2}>
+            <Icon name="ArrowDownward" mr={2} />
+            <Flex flex={1} mr={2}>
+              <Input
+                type="number"
+                step="0.1"
+                placeholder="$0.00"
+                value={this.state.amount}
+                onChange={event =>
+                  this.updateState('amount', event.target.value)
+                }
+                width={1}
+              />
+              <OutlineButton
+                ml={2}
+                onClick={() => {
+                  this.setState(
+                    {
+                      amount:
+                        Math.floor((this.props.xdaiBalance - 0.01) * 100) / 100,
+                    },
+                    () => {
+                      this.setState({
+                        canSendDai: this.canSendDai(),
+                        canSendEth: this.canSendEth(),
+                        canSendXdai: this.canSendXdai(),
+                      });
+                    }
+                  );
+                }}
+              >
+                max
+              </OutlineButton>
+            </Flex>
+            <Box mr={2}>{daiCancelButton}</Box>
+            <Button
+              width="120px"
+              disabled={buttonsDisabled}
+              onClick={() => {
                 console.log("AMOUNT:",this.state.amount,"DAI BALANCE:",this.props.daiBalance)
                 this.setState({
                   daiToXdaiMode:"withdrawing",
@@ -1319,12 +1436,13 @@ export default class Exchange extends React.Component {
                     from: this.state.daiAddress,
                     to: toDaiBridgeAccount,
                     value: core.getWeb3(XDAI_CHAIN_ID).utils.toWei(""+this.state.amount,'ether'),
-                    gas: 120000,
                     gasPrice: Math.round(1.1 * 1000000000)
                   }
                   console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
                   console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
+                  estimateTxGas(core.getWeb3(XDAI_CHAIN_ID), paramsObject, 120000).then((gas) => {
+                    paramsObject.gas = gas;
                   core.getWeb3(XDAI_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.xdaiMetaAccount.privateKey).then(signed => {
                     console.log("========= >>> SIGNED",signed)
                       core.getWeb3(XDAI_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
@@ -1344,6 +1462,7 @@ export default class Exchange extends React.Component {
                         console.log("EEEERRRRRRRROOOOORRRRR ======== >>>>>",err)
                         this.props.changeAlert({type: 'danger',message: err.toString()});
                       }).then(console.log)
+                  });
                   });
 
                 }else{
@@ -1384,57 +1503,69 @@ export default class Exchange extends React.Component {
 
                 }
 
-              }}>
-                <Scaler config={{startZoomAt:600,origin:"10% 50%"}}>
-                  <i className="fas fa-arrow-down" /> Send
-                </Scaler>
-              </button>
-
-            </div>
-          </div>
-        )
+              }}
+            >
+              <Icon name="ArrowDownward" mr={1} />
+              Send
+            </Button>
+          </Flex>
+        );
       }
     } else {
       daiToXdaiDisplay = (
-        <div className="content ops row">
-
-          <div className="col-6 p-1">
-            <button className="btn btn-large w-100" style={this.props.buttonStyle.primary} disabled={buttonsDisabled} onClick={()=>{
-              this.setState({daiToXdaiMode:"deposit"})
-            }} >
-              <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-              <i className="fas fa-arrow-up"  /> DAI to xDai
-              </Scaler>
-            </button>
-          </div>
-
-          <div className="col-6 p-1">
-            <button className="btn btn-large w-100" style={this.props.buttonStyle.primary} disabled={buttonsDisabled}  onClick={()=>{
-              this.setState({daiToXdaiMode:"withdraw"})
-            }} >
-              <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-              <i className="fas fa-arrow-down"  /> xDai to DAI
-              </Scaler>
-            </button>
-          </div>
-        </div>
-      )
+        <Flex width={1} px={3}>
+          <Button
+            width={1}
+            mr={2}
+            icon="ArrowUpward"
+            disabled={buttonsDisabled}
+            onClick={() => {
+              this.setState({ daiToXdaiMode: 'deposit' });
+            }}
+          >
+            DAI to xDai
+          </Button>
+          <Button
+            width={1}
+            icon="ArrowDownward"
+            disabled={buttonsDisabled}
+            onClick={() => {
+              this.setState({ daiToXdaiMode: 'withdraw' });
+            }}
+          >
+            xDai to DAI
+          </Button>
+        </Flex>
+      );
     }
 
     let ethToDaiDisplay =  i18n.t('loading')
 
     if(ethToDaiMode=="sending" || ethToDaiMode=="depositing" || ethToDaiMode=="withdrawing"){
       ethToDaiDisplay = (
-        <div className="content ops row" style={{position:"relative"}}>
-          <button style={{width:Math.min(100,this.state.loaderBarPercent)+"%",backgroundColor:this.state.loaderBarColor,color:"#000000"}}
-            className="btn btn-large"
+        <Box position="relative" width={1} minHeight="48px">
+          <Box
+            position="absolute"
+            left={0}
+            top={0}
+            bottom={0}
+            width={`${Math.min(100, this.state.loaderBarPercent)}%`}
+            bg={this.state.loaderBarColor}
+          />
+          <Box
+            position="absolute"
+            width={1}
+            textAlign="center"
+            style={{
+              fontSize: adjustedFontSize,
+              top: adjustedTop,
+              opacity: 0.95,
+            }}
           >
-          </button>
-          <div style={{position:'absolute',left:"50%",width:"100%",marginLeft:"-50%",fontSize:adjustedFontSize,top:adjustedTop,opacity:0.95,textAlign:"center"}}>
             {this.state.loaderBarStatusText}
-          </div>
-        </div>
-      )
+          </Box>
+        </Box>
+      );
 
     }else if(ethToDaiMode=="deposit"){
       if(!this.state.mainnetMetaAccount && this.props.network!="Mainnet"){
@@ -1442,74 +1573,97 @@ export default class Exchange extends React.Component {
           <div className="content ops row" style={{textAlign:'center'}}>
             <div className="col-12 p-1">
               Error: MetaMask network must be: <span style={{fontWeight:"bold",marginLeft:5}}>Mainnet</span>
-              <a href="#" onClick={()=>{this.setState({ethToDaiMode:false})}} style={{marginLeft:40,color:"#666666"}}>
-                <i className="fas fa-times"/> dismiss
-              </a>
+              {dismissButton(() => this.setState({ ethToDaiMode: false }))}
             </div>
           </div>
         )
       }else{
         ethToDaiDisplay = (
-          <div className="content ops row">
+          <Flex alignItems="center" px={3} py={2}>
+            <Icon name="ArrowUpward" mr={2} />
+            <Flex flex={1} mr={2}>
+              <Input
+                type="number"
+                step="0.1"
+                placeholder="$0.00"
+                value={this.state.amount}
+                onChange={event =>
+                  this.updateState('amount', event.target.value)
+                }
+                width={1}
+              />
+              <OutlineButton
+                ml={2}
+                onClick={() => {
+                  console.log('Getting gas price...');
+                  axios
+                    .get('https://ethgasstation.info/json/ethgasAPI.json', {
+                      crossdomain: true,
+                    })
+                    .catch(err => {
+                      console.log('Error getting gas price', err);
+                    })
+                    .then(response => {
+                      if (
+                        response &&
+                        response.data.average > 0 &&
+                        response.data.average < 1000
+                      ) {
+                        response.data.average =
+                          response.data.average +
+                          response.data.average * GASBOOSTPRICE;
+                        let gwei =
+                          Math.round(response.data.average * 100) / 1000;
 
-            <div className="col-1 p-1"  style={colStyle}>
-              <i className="fas fa-arrow-up"  />
-            </div>
-            <div className="col-6 p-1" style={colStyle}>
-              <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-              <div className="input-group">
-                <div className="input-group-prepend">
-                  <div className="input-group-text">$</div>
-                </div>
-                <input type="number" step="0.1" className="form-control" placeholder="0.00" value={this.state.amount}
-                       onChange={event => this.updateState('amount', event.target.value)} />
-                 <div className="input-group-append" onClick={() => {
+                        console.log(gwei);
 
-                   console.log("Getting gas price...")
-                   axios.get("https://ethgasstation.info/json/ethgasAPI.json", { crossdomain: true })
-                   .catch((err)=>{
-                     console.log("Error getting gas price",err)
-                   })
-                   .then((response)=>{
-                     if(response && response.data.average>0&&response.data.average<1000){
-                       response.data.average=response.data.average + (response.data.average*GASBOOSTPRICE)
-                       let gwei = Math.round(response.data.average*100)/1000
+                        let IDKAMOUNTTOLEAVE =
+                          gwei * (1111000000 * 2) * 201000;
 
-                       console.log(gwei)
+                        console.log(
+                          "let's leave ",
+                          IDKAMOUNTTOLEAVE,
+                          this.props.ethBalance
+                        );
 
+                        let gasInEth = this.props.web3.utils.fromWei(
+                          '' + IDKAMOUNTTOLEAVE,
+                          'ether'
+                        );
+                        console.log('gasInEth', gasInEth);
 
-                       let IDKAMOUNTTOLEAVE = gwei*(1111000000*2) * 201000 // idk maybe enough for a couple transactions?
+                        let adjustedEthBalance =
+                          parseFloat(this.props.ethBalance) -
+                          parseFloat(gasInEth);
+                        console.log(adjustedEthBalance);
 
-                       console.log("let's leave ",IDKAMOUNTTOLEAVE,this.props.ethBalance)
-
-                       let gasInEth = this.props.web3.utils.fromWei(""+IDKAMOUNTTOLEAVE,'ether')
-                       console.log("gasInEth",gasInEth)
-
-                       let adjustedEthBalance = (parseFloat(this.props.ethBalance) - parseFloat(gasInEth))
-                       console.log(adjustedEthBalance)
-
-                       this.setState({amount: Math.floor(this.props.ethprice*adjustedEthBalance*100)/100 },()=>{
-                         this.setState({ canSendDai: this.canSendDai(), canSendEth: this.canSendEth(), canSendXdai: this.canSendXdai() })
-                       })
-
-                     }
-                   })
-
-                 }}>
-                   <span className="input-group-text" id="basic-addon2" style={this.props.buttonStyle.secondary}>
-                     max
-                   </span>
-                 </div>
-              </div>
-              </Scaler>
-            </div>
-            <div className="col-2 p-1"  style={colStyle}>
-              <Scaler config={{startZoomAt:650,origin:"0% 85%"}}>
-              {ethCancelButton}
-              </Scaler>
-            </div>
-            <div className="col-3 p-1">
-              <button className="btn btn-large w-100" disabled={buttonsDisabled} style={this.props.buttonStyle.primary} onClick={async ()=>{
+                        this.setState(
+                          {
+                            amount:
+                              Math.floor(
+                                this.props.ethprice * adjustedEthBalance * 100
+                              ) / 100,
+                          },
+                          () => {
+                            this.setState({
+                              canSendDai: this.canSendDai(),
+                              canSendEth: this.canSendEth(),
+                              canSendXdai: this.canSendXdai(),
+                            });
+                          }
+                        );
+                      }
+                    });
+                }}
+              >
+                max
+              </OutlineButton>
+            </Flex>
+            <Box mr={2}>{ethCancelButton}</Box>
+            <Button
+              width="120px"
+              disabled={buttonsDisabled}
+              onClick={async () => {
 
                 console.log("Using uniswap exchange to move ETH to DAI")
 
@@ -1529,7 +1683,6 @@ export default class Exchange extends React.Component {
 
                 let output = await uniswapContract.methods.getTokenToEthOutputPrice(amountOfEth).call()
                 output = parseFloat(output)
-                output = output - (output*0.0333)
                 console.log("Expected amount of DAI: ",webToUse.utils.fromWei(""+Math.round(output),'ether'))
 
                 let currentBlockNumber = await webToUse.eth.getBlockNumber()
@@ -1583,15 +1736,13 @@ export default class Exchange extends React.Component {
                 )
 
 
-              }}>
-                <Scaler config={{startZoomAt:600,origin:"10% 50%"}}>
-                  <i className="fas fa-arrow-up" /> Send
-                </Scaler>
-              </button>
-
-            </div>
-          </div>
-        )
+              }}
+            >
+              <Icon name="ArrowUpward" mr={1} />
+              Send
+            </Button>
+          </Flex>
+        );
       }
 
     }else if(ethToDaiMode=="withdraw"){
@@ -1600,9 +1751,7 @@ export default class Exchange extends React.Component {
           <div className="content ops row" style={{textAlign:'center'}}>
             <div className="col-12 p-1">
               Error: MetaMask network must be: <span style={{fontWeight:"bold",marginLeft:5}}>Mainnet</span>
-              <a href="#" onClick={()=>{this.setState({ethToDaiMode:false})}} style={{marginLeft:40,color:"#666666"}}>
-                <i className="fas fa-times"/> dismiss
-              </a>
+              {dismissButton(() => this.setState({ ethToDaiMode: false }))}
             </div>
           </div>
         )
@@ -1611,46 +1760,50 @@ export default class Exchange extends React.Component {
           <div className="content ops row" style={{textAlign:'center'}}>
             <div className="col-12 p-1">
               Error: You must have ETH to send DAI.
-              <a href="#" onClick={()=>{this.setState({ethToDaiMode:false})}} style={{marginLeft:40,color:"#666666"}}>
-                <i className="fas fa-times"/> dismiss
-              </a>
+              {dismissButton(() => this.setState({ ethToDaiMode: false }))}
             </div>
           </div>
         )
       }else{
         ethToDaiDisplay = (
-          <div className="content ops row">
-
-            <div className="col-1 p-1"  style={colStyle}>
-              <i className="fas fa-arrow-down"  />
-            </div>
-            <div className="col-6 p-1" style={colStyle}>
-              <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-              <div className="input-group">
-                <div className="input-group-prepend">
-                  <div className="input-group-text">$</div>
-                </div>
-                <input type="number" step="0.1" className="form-control" placeholder="0.00" value={this.state.amount}
-                       onChange={event => this.updateState('amount', event.target.value)} />
-               <div className="input-group-append" onClick={() => {
-                  this.setState({amount: Math.floor((this.props.daiBalance)*100)/100 },()=>{
-                    this.setState({ canSendDai: this.canSendDai(), canSendEth: this.canSendEth(), canSendXdai: this.canSendXdai() })
-                  })
-               }}>
-                 <span className="input-group-text" id="basic-addon2" style={this.props.buttonStyle.secondary}>
-                   max
-                 </span>
-               </div>
-              </div>
-              </Scaler>
-            </div>
-            <div className="col-2 p-1"  style={colStyle}>
-              <Scaler config={{startZoomAt:650,origin:"0% 85%"}}>
-              {ethCancelButton}
-              </Scaler>
-            </div>
-            <div className="col-3 p-1">
-              <button className="btn btn-large w-100" disabled={buttonsDisabled} style={this.props.buttonStyle.primary} onClick={async ()=>{
+          <Flex alignItems="center" px={3} py={2}>
+            <Icon name="ArrowDownward" mr={2} />
+            <Flex flex={1} mr={2}>
+              <Input
+                type="number"
+                step="0.1"
+                placeholder="$0.00"
+                value={this.state.amount}
+                onChange={event =>
+                  this.updateState('amount', event.target.value)
+                }
+                width={1}
+              />
+              <OutlineButton
+                ml={2}
+                onClick={() => {
+                  this.setState(
+                    {
+                      amount: Math.floor(this.props.daiBalance * 100) / 100,
+                    },
+                    () => {
+                      this.setState({
+                        canSendDai: this.canSendDai(),
+                        canSendEth: this.canSendEth(),
+                        canSendXdai: this.canSendXdai(),
+                      });
+                    }
+                  );
+                }}
+              >
+                max
+              </OutlineButton>
+            </Flex>
+            <Box mr={2}>{ethCancelButton}</Box>
+            <Button
+              width="120px"
+              disabled={buttonsDisabled}
+              onClick={async () => {
 
                 console.log("Using uniswap exchange to move DAI to ETH")
 
@@ -1671,7 +1824,7 @@ export default class Exchange extends React.Component {
 
                 let output = await uniswapContract.methods.getEthToTokenOutputPrice(amountOfDai).call()
                 output = parseFloat(output)
-                output = Math.round(output - (output*0.0333))
+                output = Math.round(output)
                 console.log("Expected amount of ETH: ",output,webToUse.utils.fromWei(""+ output,'ether'))
 
                 let currentBlockNumber = await webToUse.eth.getBlockNumber()
@@ -1730,7 +1883,6 @@ export default class Exchange extends React.Component {
                         let paramsObject = {
                           from: this.state.daiAddress,
                           value: 0,
-                          gas: 100000,
                           gasPrice: Math.round(gwei * 1000000000)
                         }
                         console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
@@ -1740,6 +1892,8 @@ export default class Exchange extends React.Component {
 
                         console.log("APPROVE TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
+                        estimateTxGas(core.getWeb3(MAINNET_CHAIN_ID), paramsObject, 100000).then((gas) => {
+                          paramsObject.gas = gas;
                         core.getWeb3(MAINNET_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.mainnetMetaAccount.privateKey).then(signed => {
                           console.log("========= >>> SIGNED",signed)
                             core.getWeb3(MAINNET_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', async (receipt)=>{
@@ -1759,7 +1913,6 @@ export default class Exchange extends React.Component {
                                   nonce: manualNonce,
                                   from: this.state.daiAddress,
                                   value: 0,
-                                  gas: 240000,
                                   gasPrice: Math.round(gwei * 1000000000)
                                 }
                                 console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
@@ -1769,6 +1922,8 @@ export default class Exchange extends React.Component {
 
                                 console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
+                                estimateTxGas(core.getWeb3(MAINNET_CHAIN_ID), paramsObject, 240000).then((gas) => {
+                                  paramsObject.gas = gas;
                                 core.getWeb3(MAINNET_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.mainnetMetaAccount.privateKey).then(signed => {
                                   console.log("========= >>> SIGNED",signed)
                                     core.getWeb3(MAINNET_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
@@ -1784,11 +1939,13 @@ export default class Exchange extends React.Component {
                                       this.props.changeAlert({type: 'danger',message: err.toString()});
                                     }).then(console.log)
                                 });
+                                });
                               }
                             }).on('error', (err)=>{
                               this.props.changeAlert({type: 'danger',message: err.toString()});
                               console.log("EEEERRRRRRRROOOOORRRRR ======== >>>>>",err)
                             }).then(console.log)
+                        });
                         });
 
                       }else{
@@ -1802,7 +1959,6 @@ export default class Exchange extends React.Component {
                         let paramsObject = {
                           from: this.state.daiAddress,
                           value: 0,
-                          gas: 240000,
                           gasPrice: Math.round(gwei * 1000000000)
                         }
                         console.log("====================== >>>>>>>>> paramsObject!!!!!!!",paramsObject)
@@ -1812,6 +1968,8 @@ export default class Exchange extends React.Component {
 
                         console.log("TTTTTTTTTTTTTTTTTTTTTX",paramsObject)
 
+                        estimateTxGas(core.getWeb3(MAINNET_CHAIN_ID), paramsObject, 240000).then((gas) => {
+                          paramsObject.gas = gas;
                         core.getWeb3(MAINNET_CHAIN_ID).eth.accounts.signTransaction(paramsObject, this.state.mainnetMetaAccount.privateKey).then(signed => {
                           console.log("========= >>> SIGNED",signed)
                             core.getWeb3(MAINNET_CHAIN_ID).eth.sendSignedTransaction(signed.rawTransaction).on('receipt', (receipt)=>{
@@ -1827,6 +1985,7 @@ export default class Exchange extends React.Component {
                               console.log("EEEERRRRRRRROOOOORRRRR ======== >>>>>",err)
                               this.props.changeAlert({type: 'danger',message: err.toString()});
                             }).then(console.log)
+                        });
                         });
 
                       }
@@ -1923,300 +2082,399 @@ export default class Exchange extends React.Component {
                 }
 
 
-              }}>
-                <Scaler config={{startZoomAt:600,origin:"10% 50%"}}>
-                  <i className="fas fa-arrow-down" /> Send
-                </Scaler>
-              </button>
-            </div>
-          </div>
-        )
+              }}
+            >
+              <Icon name="ArrowDownward" mr={1} />
+              Send
+            </Button>
+          </Flex>
+        );
       }
 
     }else{
       ethToDaiDisplay = (
-         <div className="content ops row">
-
-           <div className="col-6 p-1">
-             <button className="btn btn-large w-100"  style={this.props.buttonStyle.primary} disabled={buttonsDisabled}  onClick={()=>{
-               this.setState({ethToDaiMode:"deposit"})
-             }}>
-               <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-                <i className="fas fa-arrow-up"  /> ETH to DAI
-               </Scaler>
-             </button>
-           </div>
-
-           <div className="col-6 p-1">
-             <button className="btn btn-large w-100"  style={this.props.buttonStyle.primary} disabled={buttonsDisabled}  onClick={()=>{
-               this.setState({ethToDaiMode:"withdraw"})
-             }}>
-              <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-               <i className="fas fa-arrow-down" /> DAI to ETH
-              </Scaler>
-             </button>
-           </div>
-         </div>
-       )
-
+        <Flex width={1} px={3}>
+          <Button
+            width={1}
+            mr={2}
+            icon="ArrowUpward"
+            disabled={buttonsDisabled}
+            onClick={() => {
+              this.setState({ ethToDaiMode: 'deposit' });
+            }}
+          >
+            <Scaler config={{ startZoomAt: 400, origin: '50% 50%' }}>
+              ETH to DAI
+            </Scaler>
+          </Button>
+          <Button
+            width={1}
+            icon="ArrowDownward"
+            disabled={buttonsDisabled}
+            onClick={() => {
+              this.setState({ ethToDaiMode: 'withdraw' });
+            }}
+          >
+            <Scaler config={{ startZoomAt: 400, origin: '50% 50%' }}>
+              DAI to ETH
+            </Scaler>
+          </Button>
+        </Flex>
+      );
     }
-
-
-
 
     let sendDaiButton = (
-      <button className="btn btn-large w-100" style={this.props.buttonStyle.secondary} disabled={buttonsDisabled} onClick={()=>{
-        this.setState({sendDai:true})
-      }}>
-        <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-          <i className="fas fa-arrow-right"></i>
-        </Scaler>
-      </button>
-    )
+      <OutlineButton
+        width={1}
+        icon="ArrowForward"
+        icononly
+        disabled={buttonsDisabled}
+        onClick={() => {
+          this.setState({ sendDai: true });
+        }}
+      />
+    );
 
-    //style={{marginTop:40,backgroundColor:this.props.mainStyle.mainColor}}
-    let sendDaiRow = ""
-    if(this.state.sendDai){
+    let sendDaiRow = '';
+    if (this.state.sendDai) {
       sendDaiRow = (
-        <div className="send-to-address card w-100" style={{marginTop:20}}>
-        <div className="content ops row">
-          <div className="form-group w-100">
-            <div className="form-group w-100">
-              <label htmlFor="amount_input">To Address</label>
-              <input type="text" className="form-control" placeholder="0x..." value={this.state.daiSendToAddress}
-                     onChange={event => this.updateState('daiSendToAddress', event.target.value)} />
-            </div>
-            <div>  { this.state.daiSendToAddress && this.state.daiSendToAddress.length==42 && <Blockies seed={this.state.daiSendToAddress.toLowerCase()} scale={10} /> }</div>
-            <label htmlFor="amount_input">Send Amount</label>
-            <div className="input-group">
-              <div className="input-group-prepend">
-                <div className="input-group-text">$</div>
-              </div>
-              <input type="number" step="0.1" className="form-control" placeholder="0.00" value={this.state.daiSendAmount}
-                     onChange={event => this.updateState('daiSendAmount', event.target.value)} />
-               <div className="input-group-append" onClick={() => {
-                  this.setState({daiSendAmount: Math.floor((this.props.daiBalance)*100)/100 },()=>{
-                    this.setState({ canSendDai: this.canSendDai(), canSendEth: this.canSendEth(), canSendXdai: this.canSendXdai() })
-                  })
-               }}>
-                 <span className="input-group-text" id="basic-addon2" style={this.props.buttonStyle.secondary}>
-                   max
-                 </span>
-               </div>
-            </div>
-            <button style={this.props.buttonStyle.primary} disabled={buttonsDisabled} className={`btn btn-success btn-lg w-100 ${this.state.canSendDai ? '' : 'disabled'}`}
-                    onClick={this.sendDai.bind(this)}>
-              Send
-            </button>
+        <Box border={1} borderColor="grey" borderRadius={1} my={3} p={3}>
+          <Field label="To Address" mb={3}>
+            <Input
+              type="text"
+              placeholder="0x..."
+              value={this.state.daiSendToAddress}
+              onChange={event =>
+                this.updateState('daiSendToAddress', event.target.value)
+              }
+              width={1}
+            />
+          </Field>
+          <div>
+            {this.state.daiSendToAddress &&
+              this.state.daiSendToAddress.length === 42 && (
+                <Blockies
+                  seed={this.state.daiSendToAddress.toLowerCase()}
+                  scale={10}
+                />
+              )}
           </div>
-        </div>
-        </div>
-      )
+          <Field label="Send Amount" mb={3}>
+            <Flex>
+              <Input
+                type="number"
+                step="0.1"
+                placeholder="$0.00"
+                value={this.state.daiSendAmount}
+                onChange={event =>
+                  this.updateState('daiSendAmount', event.target.value)
+                }
+                width={1}
+              />
+              <OutlineButton
+                ml={2}
+                onClick={() => {
+                  this.setState(
+                    {
+                      daiSendAmount:
+                        Math.floor(this.props.daiBalance * 100) / 100,
+                    },
+                    () => {
+                      this.setState({
+                        canSendDai: this.canSendDai(),
+                        canSendEth: this.canSendEth(),
+                        canSendXdai: this.canSendXdai(),
+                      });
+                    }
+                  );
+                }}
+              >
+                max
+              </OutlineButton>
+            </Flex>
+          </Field>
+          <Button
+            width={1}
+            disabled={buttonsDisabled || !this.state.canSendDai}
+            onClick={this.sendDai.bind(this)}
+          >
+            Send
+          </Button>
+        </Box>
+      );
       sendDaiButton = (
-        <button className="btn btn-large w-100" style={{backgroundColor:"#888888",whiteSpace:"nowrap"}} onClick={()=>{
-          this.setState({sendDai:false})
-        }}>
-          <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-            <i className="fas fa-times"></i>
-          </Scaler>
-        </button>
-      )
+        <OutlineButton
+          width={1}
+          icon="Close"
+          icononly
+          onClick={() => {
+            this.setState({ sendDai: false });
+          }}
+        />
+      );
     }
-
-
-
-
 
     let sendEthButton = (
-      <button className="btn btn-large w-100" disabled={buttonsDisabled} style={this.props.buttonStyle.secondary} onClick={()=>{
-        this.setState({sendEth:true})
-      }}>
-        <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-          <i className="fas fa-arrow-right"></i>
-        </Scaler>
-      </button>
-    )
+      <OutlineButton
+        width={1}
+        icon="ArrowForward"
+        icononly
+        disabled={buttonsDisabled}
+        onClick={() => {
+          this.setState({ sendEth: true });
+        }}
+      />
+    );
 
     let fundByWyreButton = (
-      <button
-        className="btn btn-large w-100 wyre-button--font-size"
+      <Button
+        width={1}
         disabled={buttonsDisabled}
-        style={
-            Object.assign({}, this.props.buttonStyle.secondary, {
-                color: '#fff',
-                backgroundColor: '#0055ff',
-                border: '2px solid #0055ff',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-            })
-        }
-        onClick={()=>{
+        style={{
+          color: '#fff',
+          backgroundColor: '#0055ff',
+          border: '2px solid #0055ff',
+        }}
+        onClick={() => {
           this.setState({ wyreWidgetOpen: true });
           Wyre.displayWidget(
-              this.props.address,
-              this.state.wyreFundAmount,
-              () => { this.setState({ wyreWidgetOpen: false }); }
+            this.props.address,
+            this.state.wyreFundAmount,
+            () => {
+              this.setState({ wyreWidgetOpen: false });
+            }
           );
         }}
-      ><Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-        <div style={{flex: '0 0 30px', textAlign: 'center'}}>
-            {this.state.wyreWidgetOpen ? (
-                <div>
-                    <span style={{paddingRight: '10px'}}>
-                        <i class="fas fa-spinner fa-spin"></i>
-                    </span>
-                    <span>Loading...</span>
-                </div>) : `Buy $${this.state.wyreFundAmount}`}
-        </div>
-        </Scaler>
-      </button>
-    )
+      >
+        <Flex alignItems="center" justifyContent="center">
+          {this.state.wyreWidgetOpen ? (
+            <>
+              <Icon name="Refresh" mr={2} />
+              Loading...
+            </>
+          ) : (
+            `Buy $${this.state.wyreFundAmount}`
+          )}
+        </Flex>
+      </Button>
+    );
 
 
-    let sendEthRow = ""
-    if(this.state.sendEth){
+    let sendEthRow = '';
+    if (this.state.sendEth) {
       sendEthRow = (
-        <div className="send-to-address card w-100" style={{marginTop:20}}>
-        <div className="content ops row">
-          <div className="form-group w-100">
-            <div className="form-group w-100">
-              <label htmlFor="amount_input">To Address</label>
-              <input type="text" className="form-control" placeholder="0x..." value={this.state.ethSendToAddress}
-                     onChange={event => this.updateState('ethSendToAddress', event.target.value)} />
-            </div>
-            <div>  { this.state.ethSendToAddress && this.state.ethSendToAddress.length==42 && <Blockies seed={this.state.ethSendToAddress.toLowerCase()} scale={10} /> }</div>
-            <label htmlFor="amount_input">Send Amount</label>
-            <div className="input-group">
-              <div className="input-group-prepend">
-                <div className="input-group-text">$</div>
-              </div>
-              <input type="number" step="0.1" className="form-control" placeholder="0.00" value={this.state.ethSendAmount}
-                     onChange={event => this.updateState('ethSendAmount', event.target.value)} />
-                     <div className="input-group-append" onClick={() => {
-
-                       console.log("Getting gas price...")
-                       axios.get("https://ethgasstation.info/json/ethgasAPI.json", { crossdomain: true })
-                       .catch((err)=>{
-                         console.log("Error getting gas price",err)
-                       })
-                       .then((response)=>{
-                         if(response && response.data.average>0&&response.data.average<1000){
-                           response.data.average=response.data.average + (response.data.average*GASBOOSTPRICE)
-                           let gwei = Math.round(response.data.average*100)/1000
-
-                           console.log(gwei)
-
-
-                           let IDKAMOUNTTOLEAVE = gwei*(1111000000*2) * 201000 // idk maybe enough for a couple transactions?
-
-                           console.log("let's leave ",IDKAMOUNTTOLEAVE,this.props.ethBalance)
-
-                           let gasInEth = this.props.web3.utils.fromWei(""+IDKAMOUNTTOLEAVE,'ether')
-                           console.log("gasInEth",gasInEth)
-
-                           let adjustedEthBalance = (parseFloat(this.props.ethBalance) - parseFloat(gasInEth))
-                           console.log(adjustedEthBalance)
-
-                           this.setState({ethSendAmount: Math.floor(this.props.ethprice*adjustedEthBalance*100)/100 },()=>{
-                             this.setState({ canSendDai: this.canSendDai(), canSendEth: this.canSendEth(), canSendXdai: this.canSendXdai() })
-                           })
-
-                         }
-                       })
-
-                     }}>
-                       <span className="input-group-text" id="basic-addon2" style={this.props.buttonStyle.secondary}>
-                         max
-                       </span>
-                     </div>
-            </div>
-            <button style={this.props.buttonStyle.primary} disabled={buttonsDisabled} className={`btn btn-success btn-lg w-100 ${this.state.canSendEth ? '' : 'disabled'}`}
-                    onClick={this.sendEth.bind(this)}>
-              Send
-            </button>
+        <Box border={1} borderColor="grey" borderRadius={1} my={3} p={3}>
+          <Field label="To Address" mb={3}>
+            <Input
+              type="text"
+              placeholder="0x..."
+              value={this.state.ethSendToAddress}
+              onChange={event =>
+                this.updateState('ethSendToAddress', event.target.value)
+              }
+              width={1}
+            />
+          </Field>
+          <div>
+            {this.state.ethSendToAddress &&
+              this.state.ethSendToAddress.length === 42 && (
+                <Blockies
+                  seed={this.state.ethSendToAddress.toLowerCase()}
+                  scale={10}
+                />
+              )}
           </div>
-        </div>
-        </div>
-      )
+          <Field label="Send Amount" mb={3}>
+            <Flex>
+              <Input
+                type="number"
+                step="0.1"
+                placeholder="$0.00"
+                value={this.state.ethSendAmount}
+                onChange={event =>
+                  this.updateState('ethSendAmount', event.target.value)
+                }
+                width={1}
+              />
+              <OutlineButton
+                ml={2}
+                onClick={() => {
+                  console.log('Getting gas price...');
+                  axios
+                    .get('https://ethgasstation.info/json/ethgasAPI.json', {
+                      crossdomain: true,
+                    })
+                    .catch(err => {
+                      console.log('Error getting gas price', err);
+                    })
+                    .then(response => {
+                      if (
+                        response &&
+                        response.data.average > 0 &&
+                        response.data.average < 1000
+                      ) {
+                        response.data.average =
+                          response.data.average +
+                          response.data.average * GASBOOSTPRICE;
+                        const gwei =
+                          Math.round(response.data.average * 100) / 1000;
+                        const IDKAMOUNTTOLEAVE =
+                          gwei * 1111000000 * 2 * 201000;
+                        const gasInEth = this.props.web3.utils.fromWei(
+                          '' + IDKAMOUNTTOLEAVE,
+                          'ether'
+                        );
+                        const adjustedEthBalance =
+                          parseFloat(this.props.ethBalance) -
+                          parseFloat(gasInEth);
+                        this.setState(
+                          {
+                            ethSendAmount:
+                              Math.floor(
+                                this.props.ethprice * adjustedEthBalance * 100
+                              ) / 100,
+                          },
+                          () => {
+                            this.setState({
+                              canSendDai: this.canSendDai(),
+                              canSendEth: this.canSendEth(),
+                              canSendXdai: this.canSendXdai(),
+                            });
+                          }
+                        );
+                      }
+                    });
+                }}
+              >
+                max
+              </OutlineButton>
+            </Flex>
+          </Field>
+          <Button
+            width={1}
+            disabled={buttonsDisabled || !this.state.canSendEth}
+            onClick={this.sendEth.bind(this)}
+          >
+            Send
+          </Button>
+        </Box>
+      );
       sendEthButton = (
-        <button className="btn btn-large w-100" style={{backgroundColor:"#888888",whiteSpace:"nowrap"}} onClick={()=>{
-          this.setState({sendEth:false})
-        }}>
-          <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-            <i className="fas fa-times"></i>
-          </Scaler>
-        </button>
-      )
+        <OutlineButton
+          width={1}
+          icon="Close"
+          icononly
+          onClick={() => {
+            this.setState({ sendEth: false });
+          }}
+        />
+      );
     }
 
-    let sendXdaiButton
+    let sendXdaiButton;
 
-    if(this.props.ERC20TOKEN){
+    if (this.props.ERC20TOKEN) {
       sendXdaiButton = (
-        <button className="btn btn-large w-100" disabled={buttonsDisabled} style={this.props.buttonStyle.secondary} onClick={()=>{this.setState({sendXdai:true})}}>
-          <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-            <i className="fas fa-arrow-right"></i>
-          </Scaler>
-        </button>
-      )
-    }else{
+        <OutlineButton
+          width={1}
+          icon="ArrowForward"
+          icononly
+          disabled={buttonsDisabled}
+          onClick={() => {
+            this.setState({ sendXdai: true });
+          }}
+        />
+      );
+    } else {
       sendXdaiButton = (
-        <button className="btn btn-large w-100" disabled={buttonsDisabled} style={this.props.buttonStyle.secondary} onClick={this.props.goBack}>
-          <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-            <i className="fas fa-arrow-right"></i>
-          </Scaler>
-        </button>
-      )
+        <OutlineButton
+          width={1}
+          icon="ArrowForward"
+          icononly
+          disabled={buttonsDisabled}
+          onClick={this.props.goBack}
+        />
+      );
     }
 
-    let sendXdaiRow = ""
-    if(this.state.sendXdai){
+    let sendXdaiRow = '';
+    if (this.state.sendXdai) {
       sendXdaiRow = (
-        <div className="send-to-address card w-100" style={{marginTop:20}}>
-        <div className="content ops row">
-          <div className="form-group w-100">
-            <div className="form-group w-100">
-              <label htmlFor="amount_input">To Address</label>
-              <input type="text" className="form-control" placeholder="0x..." value={this.state.xdaiSendToAddress}
-                     onChange={event => this.updateState('xdaiSendToAddress', event.target.value)} />
-            </div>
-            <div>  { this.state.xdaiSendToAddress && this.state.xdaiSendToAddress.length==42 && <Blockies seed={this.state.xdaiSendToAddress.toLowerCase()} scale={10} /> }</div>
-            <label htmlFor="amount_input">Send Amount</label>
-            <div className="input-group">
-              <div className="input-group-prepend">
-                <div className="input-group-text">$</div>
-              </div>
-              <input type="number" step="0.1" className="form-control" placeholder="0.00" value={this.state.xdaiSendAmount}
-                     onChange={event => this.updateState('xdaiSendAmount', event.target.value)} />
-                     <div className="input-group-append" onClick={() => {
-                           this.setState({xdaiSendAmount: Math.floor((this.props.xdaiBalance-0.01)*100)/100 },()=>{
-                             this.setState({ canSendDai: this.canSendDai(), canSendEth: this.canSendEth(), canSendXdai: this.canSendXdai() })
-                           })
-                         }
-                       }>
-                       <span className="input-group-text" id="basic-addon2" style={this.props.buttonStyle.secondary}>
-                         max
-                       </span>
-                     </div>
-            </div>
-            <button style={this.props.buttonStyle.primary} disabled={buttonsDisabled} className={`btn btn-success btn-lg w-100 ${this.state.canSendXdai ? '' : 'disabled'}`}
-                    onClick={this.sendXdai.bind(this)}>
-              Send
-            </button>
+        <Box border={1} borderColor="grey" borderRadius={1} my={3} p={3}>
+          <Field label="To Address" mb={3}>
+            <Input
+              type="text"
+              placeholder="0x..."
+              value={this.state.xdaiSendToAddress}
+              onChange={event =>
+                this.updateState('xdaiSendToAddress', event.target.value)
+              }
+              width={1}
+            />
+          </Field>
+          <div>
+            {this.state.xdaiSendToAddress &&
+              this.state.xdaiSendToAddress.length === 42 && (
+                <Blockies
+                  seed={this.state.xdaiSendToAddress.toLowerCase()}
+                  scale={10}
+                />
+              )}
           </div>
-        </div>
-        </div>
-      )
+          <Field label="Send Amount" mb={3}>
+            <Flex>
+              <Input
+                type="number"
+                step="0.1"
+                placeholder="$0.00"
+                value={this.state.xdaiSendAmount}
+                onChange={event =>
+                  this.updateState('xdaiSendAmount', event.target.value)
+                }
+                width={1}
+              />
+              <OutlineButton
+                ml={2}
+                onClick={() => {
+                  this.setState(
+                    {
+                      xdaiSendAmount:
+                        Math.floor((this.props.xdaiBalance - 0.01) * 100) /
+                        100,
+                    },
+                    () => {
+                      this.setState({
+                        canSendDai: this.canSendDai(),
+                        canSendEth: this.canSendEth(),
+                        canSendXdai: this.canSendXdai(),
+                      });
+                    }
+                  );
+                }}
+              >
+                max
+              </OutlineButton>
+            </Flex>
+          </Field>
+          <Button
+            width={1}
+            disabled={buttonsDisabled || !this.state.canSendXdai}
+            onClick={this.sendXdai.bind(this)}
+          >
+            Send
+          </Button>
+        </Box>
+      );
       sendXdaiButton = (
-        <button className="btn btn-large w-100" style={{backgroundColor:"#888888",whiteSpace:"nowrap"}} onClick={()=>{
-          this.setState({sendXdai:false})
-        }}>
-          <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-            <i className="fas fa-times"></i>
-          </Scaler>
-        </button>
-      )
+        <OutlineButton
+          width={1}
+          icon="Close"
+          icononly
+          onClick={() => {
+            this.setState({ sendXdai: false });
+          }}
+        />
+      );
     }
 
     //console.log("eth price ",this.props.ethBalance,this.props.ethprice)
@@ -2294,48 +2552,39 @@ export default class Exchange extends React.Component {
 
 
 
-            <div className="send-to-address card w-100" style={{marginTop:20,borderBottom:0,paddingTop:50}}>
-              <div className="content ops row">
-                <div className="col-2 p-1">
-                  <img style={logoStyle} src={wyrelogo} />
-                </div>
-                <div className="col-2 p-1" style={{marginTop:10}}>
+            <Box border={1} borderColor="grey" borderRadius={1} my={3} p={3} pt={4}>
+              <Flex alignItems="center">
+                <Box width="16%">
+                  <img style={logoStyle} src={wyrelogo} alt="Wyre" />
+                </Box>
+                <Box width="16%" mt={2}>
                   Wyre
-                </div>
-                <div className="col-5 p-1" style={{whiteSpace:"nowrap"}}>
-                    {/*<div className="input-group">
-                        <div className="input-group-prepend">
-                            <div className="input-group-text">$</div>
-                        </div>
-                        <input
-                            type="number"
-                            step="0.1"
-                            className="form-control"
-                            placeholder="0.00"
-                            value={this.state.wyreFundAmount}
-                            onChange={event =>
-                                this.updateState('wyreFundAmount', event.target.value)
-                            }
-                        />
-                    </div>*/}
-                    <div className="wyre-slider" style={{padding: '0 20px', display: 'flex', alignItems: 'center', paddingTop: '15px',}}>
+                </Box>
+                <Box width="42%" px={2}>
+                  <div
+                    className="wyre-slider"
+                    style={{
+                      padding: '0 20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      paddingTop: '15px',
+                    }}
+                  >
                     <InputRange
-                        maxValue={40}
-                        minValue={5}
-                        value={this.state.wyreFundAmount}
-                        formatLabel={value => `$${value}`}
-                        step={1}
-                        onChange={value =>
-                            this.updateState('wyreFundAmount', value)
-                        }
+                      maxValue={40}
+                      minValue={5}
+                      value={this.state.wyreFundAmount}
+                      formatLabel={value => `$${value}`}
+                      step={1}
+                      onChange={value =>
+                        this.updateState('wyreFundAmount', value)
+                      }
                     />
-                    </div>
-                </div>
-                <div className="col-3 p-1" style={{marginTop:8}}>
-                  {fundByWyreButton}
-                </div>
-              </div>
-            </div>
+                  </div>
+                </Box>
+                <Box width="26%">{fundByWyreButton}</Box>
+              </Flex>
+            </Box>
 
 
 
