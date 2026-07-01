@@ -7,6 +7,7 @@ import { eth, dai, xdai, NativeAsset } from '@burner-wallet/assets';
 const infuraKey = 'e0ea6e73570246bbb3d4bd042c4b5dac';
 
 const signers = [new InjectedSigner(), new LocalSigner()];
+const localSigner = signers[1];
 const gateways = [new InjectedGateway(), new InfuraGateway(infuraKey)];
 export let mainAsset = xdai;
 
@@ -26,4 +27,5 @@ const assets = [mainAsset, dai, eth];
 
 const core = new BurnerCore({ signers, gateways, assets });
 
+export { localSigner };
 export default core;
