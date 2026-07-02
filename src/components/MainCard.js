@@ -1,116 +1,98 @@
 import React from 'react';
-import { Scaler } from "dapparatus";
-import {CopyToClipboard} from "react-copy-to-clipboard";
+import { Flex, Button, Icon, OutlineButton, Box } from 'rimble-ui';
 import i18next from 'i18next';
 
-
-
-export default ({buttonStyle,ERC20TOKEN,address, balance, changeAlert, changeView, dollarDisplay, subBalanceDisplay}) => {
-
-
-  var w = window,
-  d = document,
-  e = d.documentElement,
-  g = d.getElementsByTagName('body')[0],
-  x = w.innerWidth || e.clientWidth || g.clientWidth,
-  y = w.innerHeight|| e.clientHeight|| g.clientHeight;
-
-  let pushDownWithWhiteSpace = 0
-  /*if(y){
-    if(ERC20TOKEN){
-      pushDownWithWhiteSpace = y-443
-    }else{
-      pushDownWithWhiteSpace = y-370
-    }
-
-  }
-  if(pushDownWithWhiteSpace>230){
-    pushDownWithWhiteSpace=230
-  }*/
+export default ({
+  ERC20TOKEN,
+  changeView,
+}) => {
   let sendButtons = (
-    <div>
-      <div className="content ops row">
-        <div className="col-6 p-1" onClick={() => changeView('receive')}>
-          <button className="btn btn-large w-100" style={buttonStyle.primary}>
-            <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-              {/* <i className="fas fa-qrcode"  /> Receive */}
-              <i className="fas fa-qrcode"  /> {i18next.t('main_card.receive')}
-            </Scaler>
-          </button>
-        </div>
-        <div className="col-6 p-1">
-          <button className="btn btn-large w-100" onClick={() => changeView('send_to_address')} style={buttonStyle.primary}>
-            <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-              {/* <i className="fas fa-paper-plane"/> Send */}
-              <i className="fas fa-paper-plane"/> {i18next.t('main_card.send')}
-            </Scaler>
-          </button>
-        </div>
-      </div>
-      <div className="content ops row">
-        <div className="col-6 p-1" onClick={() => changeView('apps')}>
-          <button className="btn btn-large w-100" onClick={() => changeView('apps')} style={buttonStyle.secondary}>
-            <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-              <i className="fas fa-gamepad"/> Apps
-            </Scaler>
-          </button>
-        </div>
-        <div className="col-6 p-1" onClick={() => changeView('send_with_link')}>
-          <button className="btn btn-large w-100" style={buttonStyle.secondary}>
-            <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-              <i className="fas fa-money-bill-alt"  /> {i18next.t('main_card.link')}
-            </Scaler>
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+    <Box>
+      <Flex mx={-2}>
+        <Box width={[1, 1 / 2, 1 / 2]} m={2}>
+          <Button fullWidth onClick={() => changeView('receive')}>
+            <Flex alignItems="center">
+              <Icon name="CenterFocusWeak" mr={2} />
+              {i18next.t('main_card.receive')}
+            </Flex>
+          </Button>
+        </Box>
+        <Box width={[1, 1 / 2, 1 / 2]} m={2}>
+          <Button fullWidth onClick={() => changeView('send_to_address')}>
+            <Flex alignItems="center">
+              <Icon name="Send" mr={2} />
+              {i18next.t('main_card.send')}
+            </Flex>
+          </Button>
+        </Box>
+      </Flex>
+      <Flex mx={-2}>
+        <Box width={[1, 1 / 2, 1 / 2]} m={2}>
+          <OutlineButton fullWidth onClick={() => changeView('apps')}>
+            <Flex alignItems="center">
+              <Icon name="Games" mr={2} />
+              Apps
+            </Flex>
+          </OutlineButton>
+        </Box>
+        <Box width={[1, 1 / 2, 1 / 2]} m={2}>
+          <OutlineButton fullWidth onClick={() => changeView('send_with_link')}>
+            <Flex alignItems="center">
+              <Icon name="AttachMoney" mr={2} />
+              {i18next.t('main_card.link')}
+            </Flex>
+          </OutlineButton>
+        </Box>
+      </Flex>
+    </Box>
+  );
 
-  if(ERC20TOKEN){
+  if (ERC20TOKEN) {
     sendButtons = (
-      <div>
-        <div className="content ops row">
-          <div className="col-6 p-1" onClick={() => changeView('receive')}>
-            <button className="btn btn-large w-100" style={buttonStyle.primary}>
-              <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-                <i className="fas fa-qrcode"  /> {i18next.t('main_card.receive')}
-              </Scaler>
-            </button>
-          </div>
-          <div className="col-6 p-1">
-            <button className="btn btn-large w-100" onClick={() => changeView('send_to_address')} style={buttonStyle.primary}>
-              <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-                <i className="fas fa-paper-plane"/> {i18next.t('main_card.send')}
-              </Scaler>
-            </button>
-          </div>
-        </div>
-        <div className="content ops row">
-          <div className="col-6 p-1" onClick={() => changeView('apps')}>
-            <button className="btn btn-large w-100" onClick={() => changeView('apps')} style={buttonStyle.secondary}>
-              <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-                <i className="fas fa-gamepad"/> Apps
-              </Scaler>
-            </button>
-          </div>
-          <div className="col-6 p-1" onClick={() => changeView('vendors')}>
-            <button className="btn btn-large w-100" style={buttonStyle.secondary}>
-              <Scaler config={{startZoomAt:400,origin:"50% 50%"}}>
-                <i className="fas fa-money-bill-alt"  /> {i18next.t('main_card.vendors')}
-              </Scaler>
-            </button>
-          </div>
-        </div>
-      </div>
-    )
+      <Box>
+        <Flex mx={-2}>
+          <Box width={[1, 1 / 2, 1 / 2]} m={2}>
+            <Button fullWidth onClick={() => changeView('receive')}>
+              <Flex alignItems="center">
+                <Icon name="CenterFocusWeak" mr={2} />
+                {i18next.t('main_card.receive')}
+              </Flex>
+            </Button>
+          </Box>
+          <Box width={[1, 1 / 2, 1 / 2]} m={2}>
+            <Button fullWidth onClick={() => changeView('send_to_address')}>
+              <Flex alignItems="center">
+                <Icon name="Send" mr={2} />
+                {i18next.t('main_card.send')}
+              </Flex>
+            </Button>
+          </Box>
+        </Flex>
+        <Flex mx={-2}>
+          <Box width={[1, 1 / 2, 1 / 2]} m={2}>
+            <OutlineButton fullWidth onClick={() => changeView('apps')}>
+              <Flex alignItems="center">
+                <Icon name="Games" mr={2} />
+                Apps
+              </Flex>
+            </OutlineButton>
+          </Box>
+          <Box width={[1, 1 / 2, 1 / 2]} m={2}>
+            <OutlineButton fullWidth onClick={() => changeView('vendors')}>
+              <Flex alignItems="center">
+                <Icon name="AttachMoney" mr={2} />
+                {i18next.t('main_card.vendors')}
+              </Flex>
+            </OutlineButton>
+          </Box>
+        </Flex>
+      </Box>
+    );
   }
-
 
   return (
-    <div style={{paddingTop:pushDownWithWhiteSpace}}>
-      <div>
-        {sendButtons}
-      </div>
-    </div>
-  )
-}
+    <Box pt={0}>
+      {sendButtons}
+    </Box>
+  );
+};
